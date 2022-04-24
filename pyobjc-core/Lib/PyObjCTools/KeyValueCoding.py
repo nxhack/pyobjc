@@ -11,7 +11,7 @@ Public API:
     getKey(obj, key) -> value
     getKeyPath (obj, keypath) -> value
 
-A keypath is a string containing a sequence of keys seperated by dots. The
+A keypath is a string containing a sequence of keys separated by dots. The
 path is followed by repeated calls to 'getKey'. This can be used to easily
 access nested attributes.
 
@@ -22,41 +22,33 @@ making it easier to build applications as a platform independent core with
 a Cocoa GUI layer.
 
 See the Cocoa documentation on the Apple developer website for more
-information on Key-Value coding. The protocol is basicly used to enable
+information on Key-Value coding. The protocol is basically used to enable
 weaker coupling between the view and model layers.
 """
-from __future__ import unicode_literals
-import sys
 
-__all__ = ("getKey", "setKey", "getKeyPath", "setKeyPath")
-if sys.version_info[0] == 2:  # pragma: no 3.x cover; pragma: no branch
-    __all__ = tuple(str(x) for x in __all__)
-
+from itertools import imap as map
+import collections as collections_abc
+import types
 
 import objc
-import types
-import sys
-import warnings
 
-if sys.version_info[0] == 2:  # pragma: no 3.x cover
-    from itertools import imap as map
-    import collections as collections_abc
+__all__ = ("getKey", "setKey", "getKeyPath", "setKeyPath")
+_null = objc.lookUpClass("NSNull").null()
 
-else:   # pragma: no cover (py3k)
-    basestring = str
-    import collections.abc as collections_abc
-
-_null = objc.lookUpClass('NSNull').null()
 
 def keyCaps(s):
     return s[:1].capitalize() + s[1:]
+
 
 # From http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/393090
 # Title: Binary floating point summation accurate to full precision
 # Version no: 2.2
 
+
 def msum(iterable):
-    "Full precision summation using multiple floats for intermediate values"
+    """
+    Full precision summation using multiple floats for intermediate values
+    """
     # sorted, non-overlapping partial sums
     partials = []
     for x in iterable:
@@ -73,11 +65,11 @@ def msum(iterable):
         partials[i:] = [x]
     return sum(partials, 0.0)
 
-class _ArrayOperators (object):
 
+class _ArrayOperators:
     @staticmethod
     def avg(obj, segments):
-        path = '.'.join(segments)
+        path = ".".join(segments)
         lst = getKeyPath(obj, path)
         count = len(lst)
         if count == 0:
@@ -90,7 +82,7 @@ class _ArrayOperators (object):
 
     @staticmethod
     def distinctUnionOfArrays(obj, segments):
-        path = '.'.join(segments)
+        path = ".".join(segments)
         rval = []
         s = set()
         r = []
@@ -112,7 +104,7 @@ class _ArrayOperators (object):
 
     @staticmethod
     def distinctUnionOfSets(obj, segments):
-        path = '.'.join(segments)
+        path = ".".join(segments)
         rval = set()
         for lst in obj:
             for item in (getKeyPath(item, path) for item in lst):
@@ -121,7 +113,7 @@ class _ArrayOperators (object):
 
     @staticmethod
     def distinctUnionOfObjects(obj, segments):
-        path = '.'.join(segments)
+        path = ".".join(segments)
         rval = []
         s = set()
         r = []
@@ -141,36 +133,34 @@ class _ArrayOperators (object):
                 r.append(item)
         return rval
 
-
     @staticmethod
-    def max(obj, segments):
-        path = '.'.join(segments)
+    def max(obj, segments):  # noqa: A003
+        path = ".".join(segments)
         return max(x for x in getKeyPath(obj, path) if x is not _null)
 
     @staticmethod
-    def min(obj, segments):
-        path = '.'.join(segments)
+    def min(obj, segments):  # noqa: A003
+        path = ".".join(segments)
         return min(x for x in getKeyPath(obj, path) if x is not _null)
 
     @staticmethod
-    def sum(obj, segments):
-        path = '.'.join(segments)
+    def sum(obj, segments):  # noqa: A003
+        path = ".".join(segments)
         lst = getKeyPath(obj, path)
         return msum(float(x) if x is not _null else 0.0 for x in lst)
 
     @staticmethod
     def unionOfArrays(obj, segments):
-        path = '.'.join(segments)
+        path = ".".join(segments)
         rval = []
         for lst in obj:
             rval.extend(getKeyPath(item, path) for item in lst)
         return rval
 
-
     @staticmethod
     def unionOfObjects(obj, segments):
-        path = '.'.join(segments)
-        return [ getKeyPath(item, path) for item in obj]
+        path = ".".join(segments)
+        return [getKeyPath(item, path) for item in obj]
 
 
 def getKey(obj, key):
@@ -178,7 +168,7 @@ def getKey(obj, key):
     Get the attribute referenced by 'key'. The key is used
     to build the name of an attribute, or attribute accessor method.
 
-    The following attributes and accesors are tried (in this order):
+    The following attributes and accessors are tried (in this order):
 
     - Accessor 'getKey'
     - Accesoor 'get_key'
@@ -194,7 +184,7 @@ def getKey(obj, key):
         return obj.valueForKey_(key)
 
     # check for dict-like objects
-    getitem = getattr(obj, '__getitem__', None)
+    getitem = getattr(obj, "__getitem__", None)
     if getitem is not None:
         try:
             return getitem(key)
@@ -202,12 +192,16 @@ def getKey(obj, key):
             pass
 
     # check for array-like objects
-    if isinstance(obj, (collections_abc.Sequence, collections_abc.Set)) and not isinstance(obj, (basestring, collections_abc.Mapping)):
+    if isinstance(
+        obj, (collections.abc.Sequence, collections.abc.Set)
+    ) and not isinstance(obj, (str, collections.abc.Mapping)):
+
         def maybe_get(obj, key):
             try:
                 return getKey(obj, key)
             except KeyError:
                 return _null
+
         return [maybe_get(obj, key) for obj in iter(obj)]
 
     try:
@@ -270,12 +264,12 @@ def setKey(obj, key, value):
         obj.setValue_forKey_(value, key)
         return
 
-    if isinstance(obj, collections_abc.Mapping):
+    if isinstance(obj, collections.abc.Mapping):
         obj[key] = value
         return
 
-    aBase = 'set' + keyCaps(key)
-    for accessor in (aBase + '_', aBase, 'set_' + key):
+    aBase = "set" + keyCaps(key)
+    for accessor in (aBase + "_", aBase, "set_" + key):
         m = getattr(obj, accessor, None)
         if m is None:
             continue
@@ -315,10 +309,11 @@ def setKey(obj, key, value):
     except AttributeError:
         raise KeyError("Key %s does not exist" % (key,))
 
+
 def getKeyPath(obj, keypath):
     """
     Get the value for the keypath. Keypath is a string containing a
-    path of keys, path elements are seperated by dots.
+    path of keys, path elements are separated by dots.
     """
     if not keypath:
         raise KeyError
@@ -326,15 +321,14 @@ def getKeyPath(obj, keypath):
     if obj is None:
         return None
 
-
     if isinstance(obj, (objc.objc_object, objc.objc_class)):
         return obj.valueForKeyPath_(keypath)
 
-    elements = keypath.split('.')
+    elements = keypath.split(".")
     cur = obj
     elemiter = iter(elements)
     for e in elemiter:
-        if e[:1] == '@':
+        if e[:1] == "@":
             try:
                 oper = getattr(_ArrayOperators, e[1:])
             except AttributeError:
@@ -343,10 +337,11 @@ def getKeyPath(obj, keypath):
         cur = getKey(cur, e)
     return cur
 
+
 def setKeyPath(obj, keypath, value):
     """
     Set the value at 'keypath'. The keypath is a string containing a
-    path of keys, seperated by dots.
+    path of keys, separated by dots.
     """
     if obj is None:
         return
@@ -354,7 +349,7 @@ def setKeyPath(obj, keypath, value):
     if isinstance(obj, (objc.objc_object, objc.objc_class)):
         return obj.setValue_forKeyPath_(value, keypath)
 
-    elements = keypath.split('.')
+    elements = keypath.split(".")
     cur = obj
     for e in elements[:-1]:
         cur = getKey(cur, e)
@@ -362,7 +357,7 @@ def setKeyPath(obj, keypath, value):
     return setKey(cur, elements[-1], value)
 
 
-class kvc(object):
+class kvc:
     def __init__(self, obj):
         self.__pyobjc_object__ = obj
 
@@ -373,18 +368,18 @@ class kvc(object):
         return repr(self.__pyobjc_object__)
 
     def __setattr__(self, attr, value):
-        if not attr.startswith('_'):
+        if not attr.startswith("_"):
             setKey(self.__pyobjc_object__, attr, value)
 
         else:
             object.__setattr__(self, attr, value)
 
     def __getitem__(self, item):
-        if not isinstance(item, basestring):
-            raise TypeError('Keys must be strings')
+        if not isinstance(item, str):
+            raise TypeError("Keys must be strings")
         return getKeyPath(self.__pyobjc_object__, item)
 
     def __setitem__(self, item, value):
-        if not isinstance(item, basestring):
-            raise TypeError('Keys must be strings')
+        if not isinstance(item, str):
+            raise TypeError("Keys must be strings")
         setKeyPath(self.__pyobjc_object__, item, value)

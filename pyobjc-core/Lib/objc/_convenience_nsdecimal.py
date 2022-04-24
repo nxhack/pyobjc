@@ -5,12 +5,13 @@ The actual class is defined in Foundation, but having the wrapper
 here is much more convenient.
 """
 __all__ = ()
-from objc._convenience import addConvenienceForClass
-from objc._objc import lookUpClass, NSDecimal
-import sys
 import operator
 
-NSDecimalNumber = lookUpClass('NSDecimalNumber')
+from objc._convenience import addConvenienceForClass
+from objc._objc import NSDecimal, lookUpClass
+
+NSDecimalNumber = lookUpClass("NSDecimalNumber")
+
 
 def decimal_new(cls, value=None):
     if value is None:
@@ -28,7 +29,7 @@ def decimal_new(cls, value=None):
             return cls.decimalNumberWithDecimal_(value)
         else:
             # The value is either an integer, or
-            # invalid (and numberWithLongLong_ wil raise
+            # invalid (and numberWithLongLong_ will raise
             # TypeError)
             try:
                 return cls.numberWithLongLong_(value)
@@ -36,39 +37,81 @@ def decimal_new(cls, value=None):
             except ValueError:
                 raise TypeError("Value is not a number")
 
+
+addConvenienceForClass(
+    "NSDecimalNumber",
+    (
+        ("__new__", staticmethod(decimal_new)),
+        (
+            "__add__",
+            lambda self, other: NSDecimalNumber(operator.add(NSDecimal(self), other)),
+        ),
+        (
+            "__radd__",
+            lambda self, other: NSDecimalNumber(operator.add(other, NSDecimal(self))),
+        ),
+        (
+            "__sub__",
+            lambda self, other: NSDecimalNumber(operator.sub(NSDecimal(self), other)),
+        ),
+        (
+            "__rsub__",
+            lambda self, other: NSDecimalNumber(operator.sub(other, NSDecimal(self))),
+        ),
+        (
+            "__mul__",
+            lambda self, other: NSDecimalNumber(operator.mul(NSDecimal(self), other)),
+        ),
+        (
+            "__rmul__",
+            lambda self, other: NSDecimalNumber(operator.mul(other, NSDecimal(self))),
+        ),
+        (
+            "__truediv__",
+            lambda self, other: NSDecimalNumber(
+                operator.truediv(NSDecimal(self), other)
+            ),
+        ),
+        (
+            "__rtruediv__",
+            lambda self, other: NSDecimalNumber(
+                operator.truediv(other, NSDecimal(self))
+            ),
+        ),
+        (
+            "__floordiv__",
+            lambda self, other: NSDecimalNumber(
+                operator.floordiv(NSDecimal(self), other)
+            ),
+        ),
+        (
+            "__rfloordiv__",
+            lambda self, other: NSDecimalNumber(
+                operator.floordiv(other, NSDecimal(self))
+            ),
+        ),
+        (
+            "__mod__",
+            lambda self, other: NSDecimalNumber(operator.mod(NSDecimal(self), other)),
+        ),
+        (
+            "__rmod__",
+            lambda self, other: NSDecimalNumber(operator.mod(other, NSDecimal(self))),
+        ),
+        ("__neg__", lambda self: NSDecimalNumber(operator.neg(NSDecimal(self)))),
+        ("__pos__", lambda self: NSDecimalNumber(operator.pos(NSDecimal(self)))),
+        ("__abs__", lambda self: NSDecimalNumber(abs(NSDecimal(self)))),
+        ("__lt__", lambda self, other: (NSDecimal(self) < other)),
+        ("__gt__", lambda self, other: (NSDecimal(self) > other)),
+        ("__le__", lambda self, other: (NSDecimal(self) <= other)),
+        ("__ge__", lambda self, other: (NSDecimal(self) >= other)),
+        ("__eq__", lambda self, other: (NSDecimal(self) == other)),
+        ("__ne__", lambda self, other: (NSDecimal(self) != other)),
+    ),
+)
+
 addConvenienceForClass('NSDecimalNumber', (
-    ('__new__',         staticmethod(decimal_new)),
-    ('__add__',         lambda self, other: NSDecimalNumber(operator.add(NSDecimal(self), other))),
-    ('__radd__',        lambda self, other: NSDecimalNumber(operator.add(other, NSDecimal(self)))),
-    ('__sub__',         lambda self, other: NSDecimalNumber(operator.sub(NSDecimal(self), other))),
-    ('__rsub__',        lambda self, other: NSDecimalNumber(operator.sub(other, NSDecimal(self)))),
-    ('__mul__',         lambda self, other: NSDecimalNumber(operator.mul(NSDecimal(self), other))),
-    ('__rmul__',        lambda self, other: NSDecimalNumber(operator.mul(other, NSDecimal(self)))),
-    ('__truediv__',     lambda self, other: NSDecimalNumber(operator.truediv(NSDecimal(self), other))),
-    ('__rtruediv__',    lambda self, other: NSDecimalNumber(operator.truediv(other, NSDecimal(self)))),
-    ('__floordiv__',    lambda self, other: NSDecimalNumber(operator.floordiv(NSDecimal(self), other))),
-    ('__rfloordiv__',   lambda self, other: NSDecimalNumber(operator.floordiv(other, NSDecimal(self)))),
-    ('__mod__',         lambda self, other: NSDecimalNumber(operator.mod(NSDecimal(self), other))),
-    ('__rmod__',        lambda self, other: NSDecimalNumber(operator.mod(other, NSDecimal(self)))),
-    ('__neg__',         lambda self: NSDecimalNumber(operator.neg(NSDecimal(self)))),
-    ('__pos__',         lambda self: NSDecimalNumber(operator.pos(NSDecimal(self)))),
-    ('__abs__',         lambda self: NSDecimalNumber(abs(NSDecimal(self)))),
-    ('__lt__',         lambda self, other: (NSDecimal(self) < other)),
-    ('__gt__',         lambda self, other: (NSDecimal(self) > other)),
-    ('__le__',         lambda self, other: (NSDecimal(self) <= other)),
-    ('__ge__',         lambda self, other: (NSDecimal(self) >= other)),
-    ('__eq__',         lambda self, other: (NSDecimal(self) == other)),
-    ('__ne__',         lambda self, other: (NSDecimal(self) != other)),
+    ('__div__',         lambda self, other: NSDecimalNumber(operator.div(NSDecimal(self), other))),
+    ('__rdiv__',        lambda self, other: NSDecimalNumber(operator.div(other, NSDecimal(self)))),
+    ('__cmp__',         lambda self, other: cmp(NSDecimalNumber(NSDecimal(self), other))),
 ))
-
-if sys.version_info[0] == 2:  # pragma: no 3.x cover
-    addConvenienceForClass('NSDecimalNumber', (
-        ('__div__',         lambda self, other: NSDecimalNumber(operator.div(NSDecimal(self), other))),
-        ('__rdiv__',        lambda self, other: NSDecimalNumber(operator.div(other, NSDecimal(self)))),
-        ('__cmp__',         lambda self, other: cmp(NSDecimalNumber(NSDecimal(self), other))),
-    ))
-
-else:  # pragma: no 2.x cover
-    addConvenienceForClass('NSDecimalNumber', (
-        ('__round__',       lambda self, n=0 : NSDecimalNumber(round(NSDecimal(self), n))),
-    ))

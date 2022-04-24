@@ -1237,7 +1237,6 @@ _type_lookup(PyTypeObject* tp, PyObject* name
     Py_ssize_t i, n;
     PyObject *mro, *base, *dict;
     PyObject *descr = NULL;
-    PyObject* res;
 #ifndef PyObjC_FAST_UNICODE_ASCII
     SEL sel = PyObjCSelector_DefaultSelector(PyBytes_AsString(name_bytes));
 #else
@@ -1251,7 +1250,6 @@ _type_lookup(PyTypeObject* tp, PyObject* name
     if (mro == NULL) {
         return NULL;
     }
-    res = NULL;
     PyObjC_Assert(PyTuple_Check(mro), NULL);
     n = PyTuple_GET_SIZE(mro);
     for (i = 0; i < n; i++) {
@@ -1304,14 +1302,12 @@ _type_lookup_harder(PyTypeObject* tp, PyObject* name
     Py_ssize_t i, n;
     PyObject *mro, *base;
     PyObject *descr = NULL;
-    PyObject* res;
 
     /* Look in tp_dict of types in MRO */
     mro = tp->tp_mro;
     if (mro == NULL) {
         return NULL;
     }
-    res = NULL;
     PyObjC_Assert(PyTuple_Check(mro), NULL);
     n = PyTuple_GET_SIZE(mro);
     for (i = 0; i < n; i++) {
@@ -1444,7 +1440,6 @@ _type_lookup_instance(PyObject* class_dict, PyTypeObject* tp, PyObject* name
     Py_ssize_t i, n;
     PyObject *mro, *base, *dict;
     PyObject *descr = NULL;
-    PyObject* res;
 #ifndef PyObjC_FAST_UNICODE_ASCII
     SEL sel = PyObjCSelector_DefaultSelector(PyBytes_AsString(name_bytes));
 #else
@@ -1458,7 +1453,6 @@ _type_lookup_instance(PyObject* class_dict, PyTypeObject* tp, PyObject* name
     if (mro == NULL) {
         return NULL;
     }
-    res = NULL;
     PyObjC_Assert(PyTuple_Check(mro), NULL);
     n = PyTuple_GET_SIZE(mro);
     for (i = 0; i < n; i++) {
@@ -1542,7 +1536,6 @@ _type_lookup_instance_harder(PyObject* class_dict, PyTypeObject* tp, PyObject* n
     Py_ssize_t i, n;
     PyObject *mro, *base;
     PyObject *descr = NULL;
-    PyObject* res;
 #ifndef PyObjC_FAST_UNICODE_ASCII
     SEL sel = PyObjCSelector_DefaultSelector(PyBytes_AsString(name_bytes));
 #else
@@ -1554,7 +1547,6 @@ _type_lookup_instance_harder(PyObject* class_dict, PyTypeObject* tp, PyObject* n
     if (mro == NULL) {
         return NULL;
     }
-    res = NULL;
     PyObjC_Assert(PyTuple_Check(mro), NULL);
     n = PyTuple_GET_SIZE(mro);
     for (i = 0; i < n; i++) {

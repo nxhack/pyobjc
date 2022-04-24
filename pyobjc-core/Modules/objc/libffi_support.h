@@ -18,7 +18,9 @@ typedef void (*PyObjCFFI_ClosureFunc)(ffi_cif*, void*, void**, void*);
 typedef void (*PyObjC_callback_function)(void);
 typedef void (*PyObjCBlockFunction)(void*, ...);
 
+#ifndef __arm64__
 extern int PyObjCRT_ResultUsesStret(const char*) __attribute__((__pure__));
+#endif
 extern void PyObjCFFI_FreeCIF(ffi_cif*);
 extern ffi_cif* PyObjCFFI_CIFForSignature(PyObjCMethodSignature*);
 extern IMP PyObjCFFI_MakeClosure(PyObjCMethodSignature*, PyObjCFFI_ClosureFunc, void*);

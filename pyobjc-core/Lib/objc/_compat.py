@@ -1,5 +1,6 @@
-from objc import options as _options
 import warnings
+
+from objc import options as _options
 
 
 def setVerbose(value):
@@ -22,14 +23,16 @@ def getUseKVOForSetattr():
     return _options.use_kvo
 
 
-if hasattr(_options, "strbridge_enabled"):  # pragma: no 3.x cover; pragma: no branch
-
-    def setStrBridgeEnabled(value):
-        warnings.warn("Set objc.options.strbridge_enabled instead", DeprecationWarning)
-        _options.strbridge_enabled = bool(value)
+def _setClassExtender(value):
+    warnings.warn("Set objc.options._class_extender instead", DeprecationWarning, 2)
+    _options._class_extender = value
 
 
-    def getStrBridgeEnabled():
-        warnings.warn("Read objc.options.strbridge_enabled instead", DeprecationWarning)
-        return _options.strbridge_enabled
+def allocateBuffer(length):
+    """Allocate a read/write buffer of memory of the given size."""
+    if not isinstance(length, int) or length <= 0:
+        raise TypeError("length must be a positive integer")
 
+    warnings.warn("Use bytearray instead", DeprecationWarning)
+
+    return bytearray(length)

@@ -44,6 +44,10 @@ static const char gCharEncoding[] = { _C_CHR, 0 };
 
 #   define SMALL_STRUCT_LIMIT    16
 
+#elif defined(__arm64__)
+
+/* pass */
+
 #else
 
 #   error "Unsupported MACOSX platform"
@@ -1301,7 +1305,8 @@ method_stub(ffi_cif* cif __attribute__((__unused__)), void* resp, void** args, v
                 } else {
                     const char* signature = PyObjCBlock_GetSignature(v);
                     if (signature != NULL) {
-                        PyObjCMethodSignature* sig = PyObjCMethodSignature_FromSignature(signature, YES);
+                        PyObjCMethodSignature* sig =
+                                PyObjCMethodSignature_WithMetaData(signature, NULL, YES);
 
                         if (sig == NULL) {
                             Py_DECREF(v);
@@ -3604,7 +3609,8 @@ PyObjCFFI_BuildResult(
                     } else {
                         const char* signature = PyObjCBlock_GetSignature(objc_result);
                         if (signature != NULL) {
-                            PyObjCMethodSignature* sig = PyObjCMethodSignature_FromSignature(signature, YES);
+                            PyObjCMethodSignature* sig =
+                                PyObjCMethodSignature_WithMetaData(signature, NULL, YES);
 
                             if (sig == NULL) {
                                 Py_DECREF(objc_result);
@@ -3859,6 +3865,7 @@ int PyObjCFFI_FreeByRef(Py_ssize_t argcount, void** byref, struct byref_attr* by
     return 0;
 }
 
+#ifndef __arm64__
 int
 PyObjCRT_ResultUsesStret(const char* typestr)
 {
@@ -3898,6 +3905,7 @@ PyObjCRT_ResultUsesStret(const char* typestr)
         return 0;
     }
 }
+#endif /* !__arm64__ */
 
 #define USE_ALLOCA(bufsize) 0
 
@@ -3930,7 +3938,9 @@ PyObjCFFI_Caller(PyObject *aMeth, PyObject* self, PyObject *args)
     Py_ssize_t r;
     void* msgResult;
     Py_ssize_t resultSize;
+#ifndef __arm64__
     int useStret;
+#endif
     int flags;
     SEL theSel;
     int isUninitialized;
@@ -4078,10 +4088,14 @@ PyObjCFFI_Caller(PyObject *aMeth, PyObject* self, PyObject *args)
         }
     }
 
+#ifndef __arm64__
     useStret = 0;
+#endif
 
     if (unlikely(PyObjCIMP_Check(aMeth))) {
+#ifndef __arm64__
         useStret = 0;
+#endif
         theSel = PyObjCIMP_GetSelector(aMeth);
         arglist[0] = &ffi_type_pointer;
         values[0] = &self_obj;
@@ -4099,10 +4113,12 @@ PyObjCFFI_Caller(PyObject *aMeth, PyObject* self, PyObject *args)
             objc_superSetClass(super, meth->base.sel_class);
         }
 
+#ifndef __arm64__
         useStret = PyObjCRT_ResultUsesStret(rettype);
         if (useStret == -1) {
             goto error_cleanup;
         }
+#endif
 
         superPtr = &super;
         arglist[0] = &ffi_type_pointer;
@@ -4146,6 +4162,9 @@ PyObjCFFI_Caller(PyObject *aMeth, PyObject* self, PyObject *args)
 
         } else {
 
+#ifdef __arm64__
+            ffi_call(&cif, FFI_FN(objc_msgSendSuper), msgResult, values);
+#else
             if (unlikely(useStret)) {
                 ffi_call(&cif, FFI_FN(objc_msgSendSuper_stret),
                     msgResult, values);
@@ -4154,6 +4173,7 @@ PyObjCFFI_Caller(PyObject *aMeth, PyObject* self, PyObject *args)
                     msgResult, values);
 
             }
+#endif
         }
 
     PyObjC_HANDLER
@@ -4298,14 +4318,13 @@ PyObjCFFI_FreeCIF(ffi_cif* cif)
  * a pointer to the return value, the argument array and the 'userdata'.
  */
 IMP
-PyObjCFFI_MakeClosure(
-    PyObjCMethodSignature* methinfo,
-    PyObjCFFI_ClosureFunc func,
-    void* userdata)
+PyObjCFFI_MakeClosure(PyObjCMethodSignature* methinfo, PyObjCFFI_ClosureFunc func,
+                      void* userdata)
 {
-    ffi_cif *cif;
-    ffi_closure *cl;
-    ffi_status rv;
+    ffi_cif*     cif;
+    ffi_closure* cl;
+    ffi_status   rv;
+    void* codeloc;
 
     cif = PyObjCFFI_CIFForSignature(methinfo);
     if (cif == NULL) {
@@ -4313,23 +4332,57 @@ PyObjCFFI_MakeClosure(
     }
 
     /* And finally create the actual closure */
-    /*cl = PyMem_Malloc(sizeof(*cl));*/
-    cl = PyObjC_malloc_closure();
+#ifdef HAVE_CLOSURE_POOL
+
+#if PyObjC_BUILD_RELEASE >= 1015
+    if (@available(macOS 10.15, *)) {
+        cl = ffi_closure_alloc(sizeof(*cl), &codeloc);
+    } else 
+#endif
+    {
+        cl = PyObjC_ffi_closure_alloc(sizeof(*cl), &codeloc);
+    }
+#else
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability-new"
+    cl = ffi_closure_alloc(sizeof(*cl), &codeloc);
+#pragma clang diagnostic pop
+#endif
     if (cl == NULL) {
         PyObjCFFI_FreeCIF(cif);
-        /*PyErr_NoMemory();*/
         return NULL;
     }
 
+#if PyObjC_BUILD_RELEASE >= 1015
+    if (@available(macOS 10.15, *)) {
+        rv = ffi_prep_closure_loc(cl, cif, func, userdata, codeloc);
+    } else {
+#ifdef __arm64__
+        rv = FFI_BAD_ABI;
+#else
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
+        rv = ffi_prep_closure(cl, cif, func, userdata);
+
+#pragma clang diagnostic pop
+#endif
+    }
+
+#else /* PyObjC_BUILD_RELEASE < 1015 */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     rv = ffi_prep_closure(cl, cif, func, userdata);
+#pragma clang diagnostic pop
+#endif
+
     if (rv != FFI_OK) {
         PyObjCFFI_FreeCIF(cif);
-        PyErr_Format(PyExc_RuntimeError,
-            "Cannot create FFI closure: %d", rv);
+        PyErr_Format(PyExc_RuntimeError, "Cannot create FFI closure: %d", rv);
         return NULL;
     }
 
-    return (IMP)cl;
+    return (IMP)codeloc;
 }
 
 /*
@@ -4340,13 +4393,13 @@ PyObjCFFI_MakeClosure(
 void*
 PyObjCFFI_FreeClosure(IMP closure)
 {
-    void* retval;
+    void*        retval;
     ffi_closure* cl;
 
     cl = (ffi_closure*)closure;
     retval = cl->user_data;
     PyObjCFFI_FreeCIF(cl->cif);
-    PyObjC_free_closure(cl);
+    ffi_closure_free(cl);
 
     return retval;
 }

@@ -2,39 +2,32 @@
 Implementation of NSCoding for OC_PythonObject and friends
 
 A minor problem with NSCoding support is that NSCoding restores
-graphs recusively while Pickle does so depth-first (more of less).
+graphs recursively while Pickle does so depth-first (more of less).
 This can cause problems when the object state contains the
 object itself, which is why we need a 'setValue' callback for the
 load_* functions below.
 """
-from __future__ import unicode_literals
-import sys
-import objc
-from types import *
-
-if sys.version_info[0] == 2:
-    import copy_reg as copyreg
-else:
-    import copyreg
+__all__ = ()
 
 import copy
-
+import copy_reg as copyreg
+import sys
+import collections as collections_abc
 from pickle import PicklingError, UnpicklingError
 
-if sys.version_info[0] == 2:
-    import __builtin__ as _builtins
-else:
-    import builtins as _builtins
+import objc
+from types import *
 
 # _getattribute and whichmodule are adapted from the
 # same function's in Python 3.4's pickle module. The
 # primary difference is that the functions below
 # behave as if 'allow_qualname' is true)
 
+
 def _getattribute(obj, name):
     dotted_path = name.split(".")
     for subpath in dotted_path:
-        if subpath == '<locals>':
+        if subpath == "<locals>":
             raise AttributeError("Can't get local attribute %r on %r" % (
                 name, obj))
         try:
@@ -44,8 +37,9 @@ def _getattribute(obj, name):
                 name, obj))
     return obj
 
+
 def whichmodule(obj, name):
-    module_name = getattr(obj, '__module__', None)
+    module_name = getattr(obj, "__module__", None)
     if module_name is not None:
         return module_name
 
@@ -57,48 +51,27 @@ def whichmodule(obj, name):
             if _getattribute(module, name) is obj:
                 return module_name
 
-        except AttributeError as exc:
+        except AttributeError:
             pass
 
-    return '__main__'
+    return "__main__"
 
 
+bltin_intern = intern
 
-if sys.version_info[0] == 2:  # pragma: no 3.x cover
-    bltin_intern = intern
+def intern(value):
+    if isinstance(value, objc.pyobjc_unicode):
+        return bltin_intern(value.encode('utf-8'))
+    elif isinstance(value, basestring):
+        return bltin_intern(value)
+    else:
+        return value
 
-    def intern(value):
-        if isinstance(value, objc.pyobjc_unicode):
-            return bltin_intern(value.encode('utf-8'))
-        elif isinstance(value, basestring):
-            return bltin_intern(value)
-        else:
-            return value
-
-    def import_module(name):
-        if name == 'copyreg':
-            name = 'copy_reg'
-        __import__(name, level=0)
-        return sys.modules[name]
-
-else:   # pragma: no 2.x cover
-    unicode = str
-    long = int
-    bltin_intern = sys.intern
-
-    def intern(value):
-        if isinstance(value, objc.pyobjc_unicode):
-            return bltin_intern(str(value))
-        elif isinstance(value, str):
-            return bltin_intern(value)
-        else:
-            return value
-
-    def import_module(name):
-        if name == 'copy_reg':
-            name = 'copyreg'
-        __import__(name, level=0)
-        return sys.modules[name]
+def import_module(name):
+    if name == 'copyreg':
+        name = 'copy_reg'
+    __import__(name, level=0)
+    return sys.modules[name]
 
 
 NSArray = objc.lookUpClass("NSArray")
@@ -107,22 +80,23 @@ NSDictionary = objc.lookUpClass("NSDictionary")
 NSString = objc.lookUpClass("NSString")
 NSSet = objc.lookUpClass("NSSet")
 NSMutableSet = objc.lookUpClass("NSMutableSet")
+NSData = objc.lookUpClass("NSData")
 
-kOP_REDUCE=0
-kOP_INST=1
-kOP_GLOBAL=2
-kOP_NONE=3
-kOP_BOOL=4
-kOP_INT=5
-kOP_LONG=6
-kOP_FLOAT=7
-kOP_UNICODE=8
-kOP_STRING=9
-kOP_TUPLE=10
-kOP_LIST=11
-kOP_DICT=12
-kOP_GLOBAL_EXT=13
-kOP_FLOAT_STR=14
+kOP_REDUCE = 0
+kOP_INST = 1
+kOP_GLOBAL = 2
+kOP_NONE = 3
+kOP_BOOL = 4
+kOP_INT = 5
+kOP_LONG = 6
+kOP_FLOAT = 7
+kOP_UNICODE = 8
+kOP_STRING = 9
+kOP_TUPLE = 10
+kOP_LIST = 11
+kOP_DICT = 12
+kOP_GLOBAL_EXT = 13
+kOP_FLOAT_STR = 14
 
 kKIND = NSString.stringWithString_("kind")
 kFUNC = NSString.stringWithString_("func")
@@ -136,8 +110,10 @@ kNAME = NSString.stringWithString_("name")
 kMODULE = NSString.stringWithString_("module")
 kCODE = NSString.stringWithString_("code")
 
+
 class _EmptyClass:
     pass
+
 
 encode_dispatch = {}
 
@@ -145,8 +121,10 @@ encode_dispatch = {}
 # adaptations because we're not saving to a byte stream but to another
 # serializer.
 
-def save_reduce(coder, func, args,
-        state=None, listitems=None, dictitems=None, obj=None):
+
+def save_reduce(
+    coder, func, args, state=None, listitems=None, dictitems=None, obj=None
+):
 
     if not isinstance(args, tuple):
         raise PicklingError("args from reduce() should be a tuple")
@@ -184,95 +162,86 @@ def save_reduce(coder, func, args,
             coder.encodeObject_(dict(dictitems))
         coder.encodeObject_(state)
 
-if sys.version_info[0] == 2:  # pragma: no 3.x cover
-    def save_inst(coder, obj):
-        if hasattr(obj, '__getinitargs__'):
-            args = obj.__getinitargs__()
-            len(args) # Assert it's a sequence
-        else:
-            args = ()
 
-        cls = obj.__class__
+def save_inst(coder, obj):
+    if hasattr(obj, '__getinitargs__'):
+        args = obj.__getinitargs__()
+        len(args) # Assert it's a sequence
+    else:
+        args = ()
 
-        if coder.allowsKeyedCoding():
-            coder.encodeInt32_forKey_(kOP_INST, kKIND)
-            coder.encodeObject_forKey_(cls, kCLASS)
-            coder.encodeObject_forKey_(args, kARGS)
+    cls = obj.__class__
 
-        else:
-            coder.encodeValueOfObjCType_at_(objc._C_INT, kOP_INST)
-            coder.encodeObject_(cls)
-            coder.encodeObject_(args)
+    if coder.allowsKeyedCoding():
+        coder.encodeInt32_forKey_(kOP_INST, kKIND)
+        coder.encodeObject_forKey_(cls, kCLASS)
+        coder.encodeObject_forKey_(args, kARGS)
 
-        try:
-            getstate = obj.__getstate__
-        except AttributeError:
-            state = obj.__dict__
+    else:
+        coder.encodeValueOfObjCType_at_(objc._C_INT, kOP_INST)
+        coder.encodeObject_(cls)
+        coder.encodeObject_(args)
 
-        else:
-            state = getstate()
+    try:
+        getstate = obj.__getstate__
+    except AttributeError:
+        state = obj.__dict__
 
-        if coder.allowsKeyedCoding():
-            coder.encodeObject_forKey_(state, kSTATE)
+    else:
+        state = getstate()
 
-        else:
-            coder.encodeObject_(state)
+    if coder.allowsKeyedCoding():
+        coder.encodeObject_forKey_(state, kSTATE)
 
-    encode_dispatch[InstanceType] = save_inst
+    else:
+        coder.encodeObject_(state)
 
-if sys.version_info[0] == 2:  # pragma: no 3.x cover
-    def save_int(coder, obj):
-        if coder.allowsKeyedCoding():
-            coder.encodeInt_forKey_(kOP_INT, kKIND)
-            coder.encodeInt64_forKey_(obj, kVALUE)
-        else:
-            coder.encodeValueOfObjCType_at_(objc._C_INT, kOP_INT)
-            coder.encodeValueOfObjCType_at_(objc._C_LNG_LNG, obj)
-    encode_dispatch[int] = save_int
+encode_dispatch[InstanceType] = save_inst
 
-    def save_long(coder, obj):
-        encoded = unicode(repr(obj))
-        if encoded.endswith('L'):
-            encoded = encoded[:-1]
-        if coder.allowsKeyedCoding():
-            coder.encodeInt_forKey_(kOP_LONG, kKIND)
-            coder.encodeObject_forKey_(encoded, kVALUE)
-        else:
-            coder.encodeValueOfObjCType_at_(objc._C_INT, kOP_LONG)
-            coder.encodeObject_(encoded)
+def save_int(coder, obj):
+    if coder.allowsKeyedCoding():
+        coder.encodeInt_forKey_(kOP_INT, kKIND)
+        coder.encodeInt64_forKey_(obj, kVALUE)
+    else:
+        coder.encodeValueOfObjCType_at_(objc._C_INT, kOP_INT)
+        coder.encodeValueOfObjCType_at_(objc._C_LNG_LNG, obj)
+encode_dispatch[int] = save_int
 
-    encode_dispatch[long] = save_long
-
-else: # pragma: no 2.x cover
-    def save_int(coder, obj):
-        if coder.allowsKeyedCoding():
-            coder.encodeInt_forKey_(kOP_LONG, kKIND)
-            coder.encodeObject_forKey_(unicode(repr(obj)), kVALUE)
-        else:
-            coder.encodeValueOfObjCType_at_(objc._C_INT, kOP_LONG)
-            coder.encodeObject_(unicode(repr(obj)))
-    encode_dispatch[int] = save_int
+def save_long(coder, obj):
+    encoded = unicode(repr(obj))
+    if encoded.endswith('L'):
+        encoded = encoded[:-1]
+    if coder.allowsKeyedCoding():
+        coder.encodeInt_forKey_(kOP_LONG, kKIND)
+        coder.encodeObject_forKey_(encoded, kVALUE)
+    else:
+        coder.encodeValueOfObjCType_at_(objc._C_INT, kOP_LONG)
+        coder.encodeObject_(encoded)
+encode_dispatch[long] = save_long
 
 def save_float(coder, obj):  # pragma: no cover
     # NOTE: 'no cover' because floats are encoded as OC_PythonNumber
     # and that doesn't call back to this code for basic C types.
-    # TODO: full review the code path and remove this function.
 
     # Encode floats as strings, this seems to be needed to get
     # 100% reliable round-trips.
     if coder.allowsKeyedCoding():
         coder.encodeInt_forKey_(kOP_FLOAT_STR, kKIND)
-        coder.encodeObject_forKey_(unicode(repr(obj)), kVALUE)
+        coder.encodeObject_forKey_(repr(obj), kVALUE)
     else:
         coder.encodeValueOfObjCType_at_(objc._C_INT, kOP_FLOAT_STR)
-        coder.encodeObject_(unicode(repr(obj)))
+        coder.encodeObject_(repr(obj))
+
 
 encode_dispatch[float] = save_float
 
+
 def save_global(coder, obj, name=None):
     if name is None:
-        name = getattr(obj, '__qualname__', None)
-    if name is None:
+        name = getattr(obj, "__qualname__", None)
+    if name is None:  # pragma: no cover
+        # XXX: I haven't found a type yet that
+        # doesn't have a qualname in Python 3.10...
         name = obj.__name__
 
     module_name = whichmodule(obj, name)
@@ -287,8 +256,9 @@ def save_global(coder, obj, name=None):
     else:
         if obj2 is not obj:
             raise PicklingError(
-                "Can't pickle %r: it's not the same object as %s.%s" %
-                (obj, module_name, name))
+                "Can't pickle %r: it's not the same object as %s.%s"
+                % (obj, module_name, name)
+            )
 
     code = copyreg._extension_registry.get((module_name, name))
 
@@ -299,8 +269,8 @@ def save_global(coder, obj, name=None):
 
         else:
             coder.encodeInt_forKey_(kOP_GLOBAL, kKIND)
-            coder.encodeObject_forKey_(unicode(module_name), kMODULE)
-            coder.encodeObject_forKey_(unicode(name), kNAME)
+            coder.encodeObject_forKey_(module_name, kMODULE)
+            coder.encodeObject_forKey_(name, kNAME)
 
     else:
         if code:
@@ -309,69 +279,87 @@ def save_global(coder, obj, name=None):
 
         else:
             coder.encodeValueOfObjCType_at_(objc._C_INT, kOP_GLOBAL)
-            coder.encodeObject_(unicode(module_name))
-            coder.encodeObject_(unicode(name))
+            coder.encodeObject_(module_name)
+            coder.encodeObject_(name)
 
-if sys.version_info[0] == 2:  # pragma: no 3.x cover
-    encode_dispatch[ClassType] = save_global
+
+encode_dispatch[ClassType] = save_global
 encode_dispatch[type(save_global)] = save_global
 try:
     dir.__reduce__()
-except TypeError:
+except TypeError:  # pragma: no cover
     encode_dispatch[type(dir)] = save_global
 
+
 def save_type(coder, obj):
-    if obj is type(None):
+    if obj is type(None):  # noqa: E721
         return save_reduce(coder, type, (None,), obj=obj)
     elif obj is type(NotImplemented):
         return save_reduce(coder, type, (NotImplemented,), obj=obj)
     elif obj is type(Ellipsis):
         return save_reduce(coder, type, (Ellipsis,), obj=obj)
     return save_global(coder, obj)
+
+
 encode_dispatch[type] = save_type
 
 
 def save_ellipsis(coder, obj):
-    save_global(coder, Ellipsis, 'Ellipsis')
+    save_global(coder, Ellipsis, "Ellipsis")
+
+
 encode_dispatch[type(Ellipsis)] = save_ellipsis
 
+
 def save_notimplemented(coder, obj):
-    save_global(coder, NotImplemented, 'NotImplemented')
+    save_global(coder, NotImplemented, "NotImplemented")
+
+
 encode_dispatch[type(NotImplemented)] = save_notimplemented
 
 
-
-
 decode_dispatch = {}
+
 
 def load_int(coder, setValue):
     if coder.allowsKeyedCoding():
         return int(coder.decodeInt64ForKey_(kVALUE))
     else:
         return int(coder.decodeValueOfObjCType_at_(objc._C_LNG_LNG, None))
+
+
 decode_dispatch[kOP_INT] = load_int
+
 
 def load_long(coder, setValue):
     if coder.allowsKeyedCoding():
-        return long(coder.decodeObjectForKey_(kVALUE))
+        return int(coder.decodeObjectForKey_(kVALUE))
     else:
-        return long(coder.decodeObject())
+        return int(coder.decodeObject())
+
+
 decode_dispatch[kOP_LONG] = load_long
 
-def load_float(coder, setValue): # pragma: no cover
+
+def load_float(coder, setValue):  # pragma: no cover
     # Only used with old versions of PyObjC (before 2.3), keep
     # for backward compatibility.
     if coder.allowsKeyedCoding():
         return coder.decodeFloatForKey_(kVALUE)
     else:
         raise RuntimeError("Unexpected encoding")
+
+
 decode_dispatch[kOP_FLOAT] = load_float
+
 
 def load_float_str(coder, setValue):
     if coder.allowsKeyedCoding():
         return float(coder.decodeObjectForKey_(kVALUE))
     else:
         return float(coder.decodeObject())
+
+
 decode_dispatch[kOP_FLOAT_STR] = load_float_str
 
 
@@ -393,6 +381,8 @@ def load_global_ext(coder, setValue):
     klass = _getattribute(mod, name)
     copyreg._extension_cache[code] = klass
     return klass
+
+
 decode_dispatch[kOP_GLOBAL_EXT] = load_global_ext
 
 
@@ -407,17 +397,25 @@ def load_global(coder, setValue):
     mod = import_module(module_name)
     return _getattribute(mod, name)
 
+
 decode_dispatch[kOP_GLOBAL] = load_global
 
 
 def load_inst(coder, setValue):
+    # This function is only used for loading archivees
+    # created using older version of PyObjC.
+    #
+    # Because increasing coverage in this file requires
+    # using an old version of PyObjC to create new test
+    # archives I've copped out and just disabled coverage
+    # testing for the parts not tested by the current
+    # archives.
     if coder.allowsKeyedCoding():
         cls = coder.decodeObjectForKey_(kCLASS)
         initargs = coder.decodeObjectForKey_(kARGS)
     else:
         cls = coder.decodeObject()
         initargs = coder.decodeObject()
-
 
     if (sys.version_info[0] == 2 and not initargs and
             type(cls) is ClassType and
@@ -432,7 +430,6 @@ def load_inst(coder, setValue):
             raise TypeError("in constructor for %s: %s" % (
                 cls.__name__, str(err)), sys.exc_info()[2])
 
-
     # We now have the object, but haven't set the correct
     # state yet.  Tell the bridge about this value right
     # away, that's needed because `value` might be part
@@ -443,7 +440,7 @@ def load_inst(coder, setValue):
         state = coder.decodeObjectForKey_(kSTATE)
     else:
         state = coder.decodeObject()
-        if isinstance(state, NSArray):
+        if isinstance(state, collections_abc.Sequence):
             state = tuple(state)
 
     setstate = getattr(value, "__setstate__", None)
@@ -452,31 +449,24 @@ def load_inst(coder, setValue):
         return value
 
     slotstate = None
-    if isinstance(state, tuple) and len(state) == 2:
-        state, slotstate = state
+    if isinstance(state, tuple) and len(state) == 2:  # pragma: no branch
+        state, slotstate = state  # pragma:  no cover
 
-    if state:
-        # Note: pickle.py catches RuntimeError here,
-        # that's for supporting restricted mode and
-        # is not relevant for PyObjC.
-        inst_dict = value.__dict__
-        for k in state:
-            v = state[k]
-            if type(k) == objc.pyobjc_unicode:
-                inst_dict[intern(str(k))] = v
-            elif type(k) == str:
-                inst_dict[intern(k)] = v
-            else:
-                inst_dict[k] = v
+    # Note: pickle.py catches RuntimeError here,
+    # that's for supporting restricted mode and
+    # is not relevant for PyObjC.
+    inst_dict = value.__dict__
+    for k in state or ():
+        v = state[k]
+        inst_dict[intern(k)] = v
 
-
-    if slotstate:
+    if slotstate:  # pragma: no cover
         for k, v in slotstate.items():
-            if isinstance(k, objc.pyobjc_unicode):
-                k = k.encode('utf-8')
             setattr(value, intern(k), v)
 
     return value
+
+
 decode_dispatch[kOP_INST] = load_inst
 
 
@@ -488,7 +478,6 @@ def load_reduce(coder, setValue):
     else:
         func = coder.decodeObject()
         args = coder.decodeObject()
-
 
         new_args = []
         for a in args:
@@ -565,7 +554,6 @@ def load_reduce(coder, setValue):
             else:
                 inst_dict[k] = v
 
-
     if slotstate:
         for k, v in slotstate.items():
             setattr(value, intern(k), v)
@@ -579,6 +567,8 @@ def load_reduce(coder, setValue):
             value[k] = v
 
     return value
+
+
 decode_dispatch[kOP_REDUCE] = load_reduce
 
 
@@ -617,12 +607,14 @@ def pyobjectEncode(self, coder):
     if type(rv) is not tuple:
         raise PicklingError("%s must return string or tuple" % reduce)
 
-    l = len(rv)
-    if not (2 <= l <= 5):
-        raise PicklingError("Tuple returned by %s must have two to "
-                "five elements" % reduce)
+    rv_len = len(rv)
+    if not (2 <= rv_len <= 5):
+        raise PicklingError(
+            "Tuple returned by %s must have two to " "five elements" % reduce
+        )
 
     save_reduce(coder, *rv)
+
 
 def pyobjectDecode(coder, setValue):
     if coder.allowsKeyedCoding():
@@ -634,6 +626,7 @@ def pyobjectDecode(coder, setValue):
         raise UnpicklingError("Unknown object kind: %s"%(tp,))
 
     return f(coder, setValue)
+
 
 # An finally register the coder/decoder
 objc.options._nscoding_version = 1

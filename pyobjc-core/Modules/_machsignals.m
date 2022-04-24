@@ -60,6 +60,8 @@ HandleSIG(int signum)
      * Send a mach_msg to ourselves (since that is signal safe) telling us
      * to handle a signal.
      */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
     mach_msg_return_t msg_result;
     mach_msg_header_t header;
 
@@ -71,6 +73,7 @@ HandleSIG(int signum)
     header.msgh_id = signum;
 
     msg_result = mach_msg_send(&header);
+#pragma clang diagnostic pop
 }
 
 PyDoc_STRVAR(machsignals_handleSignal_doc,

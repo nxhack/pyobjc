@@ -41,7 +41,10 @@
 
 +(int)compareA:(NSNumber*)a andB:(NSNumber*)b
 {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
     return [a compare:b];
+#pragma clang diagnostic pop
 }
 
 +(BOOL)number:(NSNumber*)a isEqualTo:(NSNumber*)b

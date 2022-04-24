@@ -523,7 +523,6 @@ static PyObject*
 loadBundle(PyObject* self __attribute__((__unused__)), PyObject* args, PyObject* kwds)
 {
 static char* keywords[] = { "module_name", "module_globals", "bundle_path", "bundle_identifier", "scan_classes", NULL };
-static Py_ssize_t curClassCount = -1;
     NSBundle* bundle = nil;
     id bundle_identifier = nil;
     id bundle_path = nil;
@@ -593,7 +592,7 @@ static Py_ssize_t curClassCount = -1;
         return NULL;
     }
 
-    curClassCount = len = PyTuple_GET_SIZE(class_list);
+    len = PyTuple_GET_SIZE(class_list);
     for (i = 0; i < len; i++) {
         PyObject* item;
         const char* nm;
@@ -2837,6 +2836,12 @@ PyObjC_MODULE_INIT(_objc)
         PyObjC_INITERROR();
     }
 #endif /* MAC_OS_X_VERSION_10_14_4 */
+
+#ifdef MAC_OS_X_VERSION_12_3
+    if (PyModule_AddIntConstant(m, "MAC_OS_X_VERSION_12_3", MAC_OS_X_VERSION_12_3) < 0) {
+        PyObjC_INITERROR();
+    }
+#endif /* MAC_OS_X_VERSION_12_3 */
 
     if (PyModule_AddIntConstant(m, "PyObjC_BUILD_RELEASE", PyObjC_BUILD_RELEASE) < 0) {
         PyObjC_INITERROR();

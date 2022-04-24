@@ -425,7 +425,6 @@ _type_lookup(PyTypeObject* tp, PyObject* name
     Py_ssize_t i, n;
     PyObject *mro, *base, *dict;
     PyObject *descr = NULL;
-    PyObject* res;
 #ifndef PyObjC_FAST_UNICODE_ASCII
     SEL sel = PyObjCSelector_DefaultSelector(PyBytes_AsString(name_bytes));
 #else
@@ -438,7 +437,6 @@ _type_lookup(PyTypeObject* tp, PyObject* name
         return NULL;
     }
 
-    res = NULL;
     PyObjC_Assert(PyTuple_Check(mro), NULL);
     n = PyTuple_GET_SIZE(mro);
     for (i = 0; i < n; i++) {
@@ -507,7 +505,6 @@ _type_lookup_harder(PyTypeObject* tp, PyObject* name
     Py_ssize_t i, n;
     PyObject *mro, *base;
     PyObject *descr = NULL;
-    PyObject* res;
     char selbuf[2048];
     char* sel_name;
 
@@ -517,7 +514,6 @@ _type_lookup_harder(PyTypeObject* tp, PyObject* name
         return NULL;
     }
 
-    res = NULL;
     PyObjC_Assert(PyTuple_Check(mro), NULL);
     n = PyTuple_GET_SIZE(mro);
 
@@ -1083,7 +1079,7 @@ obj_get_blocksignature(PyObject* self, void* closure __attribute__((__unused__))
         } else {
             const char* typestr = PyObjCBlock_GetSignature(PyObjCObject_GetObject(self));
             if (typestr != NULL) {
-                v = (PyObject*)PyObjCMethodSignature_FromSignature(typestr, YES);
+                v = (PyObject*)PyObjCMethodSignature_WithMetaData(typestr, NULL, YES);
                 if (v == NULL) {
                     return NULL;
                 }

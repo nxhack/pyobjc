@@ -102,6 +102,7 @@
 #include "objc-object.h"
 #include "selector.h"
 #include "python-method.h"
+#include "libffi_extra.h"
 #include "libffi_support.h"
 #include "super-call.h"
 #include "instance-var.h"

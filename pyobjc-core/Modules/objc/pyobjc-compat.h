@@ -203,6 +203,90 @@ typedef unsigned int NSUInteger;
 #define MAC_OS_X_VERSION_10_14_4 101404
 #endif
 
+#ifndef MAC_OS_X_VERSION_10_14_5
+#define MAC_OS_X_VERSION_10_14_5 101405
+#endif
+
+#ifndef MAC_OS_X_VERSION_10_14_6
+#define MAC_OS_X_VERSION_10_14_6 101406
+#endif
+
+#ifndef MAC_OS_X_VERSION_10_15
+#define MAC_OS_X_VERSION_10_15 101500
+#endif
+
+#ifndef MAC_OS_X_VERSION_10_15_1
+#define MAC_OS_X_VERSION_10_15_1 101501
+#endif
+
+#ifndef MAC_OS_X_VERSION_10_15_2
+#define MAC_OS_X_VERSION_10_15_2 101502
+#endif
+
+#ifndef MAC_OS_X_VERSION_10_15_3
+#define MAC_OS_X_VERSION_10_15_3 101503
+#endif
+
+#ifndef MAC_OS_X_VERSION_10_15_4
+#define MAC_OS_X_VERSION_10_15_4 101504
+#endif
+
+#ifndef MAC_OS_X_VERSION_10_15_5
+#define MAC_OS_X_VERSION_10_15_5 101505
+#endif
+
+#ifndef MAC_OS_X_VERSION_10_15_6
+#define MAC_OS_X_VERSION_10_15_6 101506
+#endif
+
+#ifndef MAC_OS_X_VERSION_10_16
+#define MAC_OS_X_VERSION_10_16 101600
+#endif
+
+#ifndef MAC_OS_X_VERSION_11_0
+#define MAC_OS_X_VERSION_11_0 110000
+#endif
+
+#ifndef MAC_OS_X_VERSION_11_1
+#define MAC_OS_X_VERSION_11_1 110100
+#endif
+
+#ifndef MAC_OS_X_VERSION_11_2
+#define MAC_OS_X_VERSION_11_2 110200
+#endif
+
+#ifndef MAC_OS_X_VERSION_11_3
+#define MAC_OS_X_VERSION_11_3 110300
+#endif
+
+#ifndef MAC_OS_X_VERSION_11_4
+#define MAC_OS_X_VERSION_11_4 110400
+#endif
+
+#ifndef MAC_OS_X_VERSION_11_5
+#define MAC_OS_X_VERSION_11_5 110500
+#endif
+
+#ifndef MAC_OS_X_VERSION_11_6
+#define MAC_OS_X_VERSION_11_6 110600
+#endif
+
+#ifndef MAC_OS_X_VERSION_12_0
+#define MAC_OS_X_VERSION_12_0 120000
+#endif
+
+#ifndef MAC_OS_X_VERSION_12_1
+#define MAC_OS_X_VERSION_12_1 120100
+#endif
+
+#ifndef MAC_OS_X_VERSION_12_2
+#define MAC_OS_X_VERSION_12_2 120200
+#endif
+
+#ifndef MAC_OS_X_VERSION_12_3
+#define MAC_OS_X_VERSION_12_3 120300
+#endif
+
 #if PyObjC_BUILD_RELEASE <= 1005
 
 /* On MacOS X, +signatureWithObjCTypes: is a method of NSMethodSignature,
@@ -371,10 +455,29 @@ typedef unsigned int NSUInteger;
  *
  */
 
-
 #define PyObjC__STR(x) #x
 #define PyObjC_STR(x) PyObjC__STR(x)
 
+#ifndef Py_SET_TYPE
+#define Py_SET_TYPE(obj, type)                                                           \
+    do {                                                                                 \
+        Py_TYPE((obj)) = (type);                                                         \
+    } while (0)
+#endif
+
+#ifndef Py_SET_SIZE
+#define Py_SET_SIZE(obj, size)                                                           \
+    do {                                                                                 \
+        Py_SIZE((obj)) = (size);                                                         \
+    } while (0)
+#endif
+
+#ifndef Py_SET_REFCNT
+#define Py_SET_REFCNT(obj, count)                                                        \
+    do {                                                                                 \
+        Py_REFCNT((obj)) = (count);                                                      \
+    } while (0)
+#endif
 
 /* Use CLINIC_SEP between the prototype and
  * description in doc strings, to get clean
@@ -643,5 +746,9 @@ static inline PyObject* _PyObjCTuple_GetItem(PyObject* tuple, Py_ssize_t idx)
     }
 
 
+#define PyObjC_LEAVE_GIL                                                                 \
+    do {                                                                                 \
+        PyGILState_Release(_GILState);                                                   \
+    } while (0)
 
 #endif /* PyObjC_COMPAT_H */

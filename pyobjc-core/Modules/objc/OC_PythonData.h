@@ -6,8 +6,8 @@
  *     in Objective-C.
  */
 
-#import "pyobjc.h"
 
+#import "pyobjc.h"
 
 /*!
  * @class       OC_PythonData
@@ -18,8 +18,9 @@
  *              (except str, unicode) can be used everywhere where NSData
  *              is expected.
  */
-@interface OC_PythonData : NSData
-{
+NS_ASSUME_NONNULL_BEGIN
+
+@interface OC_PythonData : NSMutableData {
     PyObject* value;
 }
 
@@ -31,7 +32,7 @@
  *
  * Caller must own the GIL.
  */
-+(OC_PythonData*)dataWithPythonObject:(PyObject*)value;
++ (instancetype _Nullable)dataWithPythonObject:(PyObject*)value;
 
 /*!
  * @method initWithPythonObject:
@@ -41,31 +42,34 @@
  *
  * Caller must own the GIL.
  */
--(OC_PythonData*)initWithPythonObject:(PyObject*)value;
+- (instancetype _Nullable)initWithPythonObject:(PyObject*)value;
 
 /*!
  * @method dealloc
  * @abstract Deallocate the object
  */
--(void)dealloc;
+- (void)dealloc;
 
 /*!
  * @method dealloc
  * @abstract Access the wrapped Python buffer
  * @result Returns a new reference to the wrapped Python buffer.
  */
--(PyObject*)__pyobjc_PythonObject__;
+- (PyObject*)__pyobjc_PythonObject__;
 
 /*!
  * @method length
  * @result Returns the length of the wrapped Python buffer
  */
--(NSUInteger)length;
+- (NSUInteger)length;
 
 /*!
  * @method bytes
  * @result Returns a pointer to the contents of the Python buffer
  */
--(const void *)bytes;
+- (const void*)bytes;
+- (void*)mutableBytes;
 
 @end
+
+NS_ASSUME_NONNULL_END

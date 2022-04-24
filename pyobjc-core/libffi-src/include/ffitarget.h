@@ -8,6 +8,8 @@
 #include "x86-ffitarget.h"
 #elif defined(__ppc__) || defined(__ppc64__)
 #include "ppc-ffitarget.h"
+#elif defined(__aarch64__) || defined(__arm64__) || defined (_M_ARM64)
+#include "aarch64-ffitarget.h"
 #else
 #error "Unsupported CPU type"
 #endif

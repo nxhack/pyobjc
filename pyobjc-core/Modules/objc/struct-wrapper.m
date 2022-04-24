@@ -926,6 +926,7 @@ make_init(const char* typestr)
 static ffi_cif* init_cif = NULL;
     ffi_closure* cl = NULL;
     ffi_status rv;
+    void* codeloc;
 
     typestr = PyObjCUtil_Strdup(typestr);
     if (typestr == NULL) {
@@ -933,8 +934,11 @@ static ffi_cif* init_cif = NULL;
     }
 
     if (init_cif == NULL) {
-        PyObjCMethodSignature* signature;
-        signature = PyObjCMethodSignature_FromSignature("i^v^v^v", YES);
+        PyObjCMethodSignature* signature =
+        PyObjCMethodSignature_WithMetaData("i^v^v^v", NULL, YES);
+        if (signature == NULL) {
+            return NULL; // LCOV_EXCL_LINE
+        }
         init_cif = PyObjCFFI_CIFForSignature(signature);
         Py_DECREF(signature);
         if (init_cif == NULL) {
@@ -943,15 +947,16 @@ static ffi_cif* init_cif = NULL;
         }
     }
 
-    cl = PyObjC_malloc_closure();
+    cl = ffi_closure_alloc(sizeof(*cl), &codeloc);
     if (cl == NULL) {
         PyMem_Free((void*)typestr);
         return NULL;
     }
 
-    rv = ffi_prep_closure(cl, init_cif, struct_init, (char*)typestr);
+    rv = ffi_prep_closure_loc(cl, init_cif, struct_init, (char*)typestr, codeloc);
+    
     if (rv != FFI_OK) {
-        PyObjC_free_closure(cl);
+        ffi_closure_free(cl);
         PyMem_Free((void*)typestr);
         PyErr_Format(PyExc_RuntimeError,
             "Cannot create FFI closure: %d", rv);

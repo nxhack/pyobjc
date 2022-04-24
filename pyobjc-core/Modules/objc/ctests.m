@@ -525,6 +525,9 @@ BEGIN_UNITTEST(TestArrayCoding)
       * for key-value coding.
          */
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+
     NSMutableDictionary* d;
     NSMutableArray* a;
     NSObject* v;
@@ -549,6 +552,7 @@ BEGIN_UNITTEST(TestArrayCoding)
     NS_ENDHANDLER
 
     [p release];
+#pragma clang diagnostic pop
 
     ASSERT(!haveException);
 END_UNITTEST
