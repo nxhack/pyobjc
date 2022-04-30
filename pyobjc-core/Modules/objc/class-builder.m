@@ -233,7 +233,8 @@ build_intermediate_class(Class base_class, char* name)
             }
         }
 
-        PyObjCMethodSignature* methinfo = PyObjCMethodSignature_FromSignature(cur->typestr, NO);
+        PyObjCMethodSignature* methinfo =
+            PyObjCMethodSignature_WithMetaData(cur->typestr, NULL, NO);
         if (methinfo == NULL) goto error_cleanup;
         IMP closure = PyObjCFFI_MakeClosure(methinfo, cur->func, base_class);
         Py_CLEAR(methinfo);
@@ -306,6 +307,13 @@ tc2tc(char* buf)
 exit:
     switch (*buf) {
     case _C_NSBOOL:
+#ifdef __arm64__
+        *buf = _C_BOOL;
+#else
+        *buf = _C_CHR;
+#endif
+        break;
+
     case _C_CHAR_AS_INT:
     case _C_CHAR_AS_TEXT:
         *buf = _C_CHR;
@@ -1007,7 +1015,8 @@ PyObjCClass_BuildClass(Class super_class, PyObject* protocols,
                     }
                 }
 
-                PyObjCMethodSignature* methinfo = PyObjCMethodSignature_FromSignature(cur->typestr, NO);
+                PyObjCMethodSignature* methinfo =
+                    PyObjCMethodSignature_WithMetaData(cur->typestr, NULL, NO);
                 if (methinfo == NULL) goto error_cleanup;
 
                 IMP closure = PyObjCFFI_MakeClosure(methinfo, cur->func, super_class);
@@ -1352,7 +1361,7 @@ object_method_dealloc(
     objc_superSetClass(spr, (Class)userdata);
     objc_superSetReceiver(spr, self);
 
-    objc_msgSendSuper(&spr, _meth);
+    ((void (*)(struct objc_super*, SEL))objc_msgSendSuper)(&spr, _meth);
 }
 
 /* -copyWithZone:(NSZone*)zone */
@@ -1376,7 +1385,8 @@ object_method_copyWithZone_(
 
     objc_superSetClass(spr, (Class)userdata);
     objc_superSetReceiver(spr, self);
-    copy = objc_msgSendSuper(&spr, _meth, zone);
+    copy =
+        ((id(*)(struct objc_super*, SEL, NSZone*))objc_msgSendSuper)(&spr, _meth, zone);
 
     if (copy == nil) {
         *(id*)resp = nil;
@@ -1470,7 +1480,8 @@ object_method_respondsToSelector(
     objc_superSetClass(spr, (Class)userdata);
     objc_superSetReceiver(spr, self);
 
-    *pres = ((int(*)(struct objc_super*, SEL, SEL))objc_msgSendSuper)(&spr, _meth, aSelector);
+    *pres = ((int (*)(struct objc_super*, SEL, SEL))objc_msgSendSuper)(&spr, _meth,
+                                                                           aSelector);
     return;
 }
 
@@ -1497,7 +1508,8 @@ object_method_methodSignatureForSelector(
     objc_superSetReceiver(spr, self);
 
     NS_DURING
-        *presult = objc_msgSendSuper(&spr, _meth, aSelector);
+        *presult = ((NSMethodSignature * (*)(struct objc_super*, SEL, SEL))
+                         objc_msgSendSuper)(&spr, _meth, aSelector);
 
     NS_HANDLER
         *presult = nil;
@@ -1605,13 +1617,14 @@ object_method_forwardInvocation(
         objc_superSetClass(spr, (Class)userdata);
         objc_superSetReceiver(spr, self);
         PyGILState_Release(state);
-        objc_msgSendSuper(&spr, _meth, invocation);
+        ((void (*)(struct objc_super*, SEL, NSInvocation*))objc_msgSendSuper)(&spr, _meth,
+                                                                              invocation);
         return;
     }
 
 
-    signature = PyObjCMethodSignature_FromSignature(
-        PyObjCSelector_Signature(pymeth), NO);
+    signature =
+        PyObjCMethodSignature_WithMetaData(PyObjCSelector_Signature(pymeth), NULL, NO);
     len = Py_SIZE(signature);
 
     Py_XDECREF(pymeth); pymeth = NULL;
@@ -1984,7 +1997,8 @@ object_method_valueForKey_(
     NS_DURING
         objc_superSetClass(spr, (Class)userdata);
         objc_superSetReceiver(spr, self);
-        *((id *)retval) = (id)objc_msgSendSuper(&spr, _meth, key);
+        *((id*)retval)  = ((id(*)(struct objc_super*, SEL, NSString*))objc_msgSendSuper)(
+            &spr, _meth, key);
     NS_HANDLER
 
     /* Parent doesn't know the key, try to create in the
@@ -2064,7 +2078,9 @@ object_method_setValue_forKey_(
         /* First check super */
         objc_superSetClass(spr, (Class)userdata);
         objc_superSetReceiver(spr, self);
-        (void)objc_msgSendSuper(&spr, _meth, value, key);
+        ((void (*)(struct objc_super*, SEL, id, id))objc_msgSendSuper)(&spr, _meth, value,
+                                                                       key);
+
     NS_HANDLER
         /* Parent doesn't know the key, try to create in the
          * python side, just like for plain python objects.

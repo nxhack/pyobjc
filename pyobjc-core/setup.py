@@ -66,10 +66,14 @@ def get_sdk_level(sdk):
 CFLAGS = [
     "-g",
     "-fexceptions",
-
+    # Explicitly opt-out of ARC
+    "-fno-objc-arc",
     # Loads of warning flags
-    "-Wall", "-Wstrict-prototypes", "-Wmissing-prototypes",
-    "-Wformat=2", "-W",
+    "-Wall",
+    "-Wstrict-prototypes",
+    "-Wmissing-prototypes",
+    "-Wformat=2",
+    "-W",
     "-Wpointer-arith",
     "-Wmissing-declarations",
     "-Wnested-externs",
@@ -77,18 +81,36 @@ CFLAGS = [
     "-Wno-import",
     "-Wno-unknown-pragmas",
     "-Wshorten-64-to-32",
+    # "-fsanitize=address", "-fsanitize=undefined", "-fno-sanitize=vptr",
+    # "--analyze",
+    "-Werror",
+    "-I/usr/include/ffi",
+    "-fvisibility=hidden",
+    # "-O0",
+    "-g",
+    "-O3",
+    "-flto=thin",
 ]
 
+###    "-Wno-implicit-function-declaration",
 # CFLAGS for other (test) extensions:
 EXT_CFLAGS = CFLAGS + ["-IModules/objc"]
 
 # LDFLAGS for the objc._objc extension
 OBJC_LDFLAGS = [
-    '-framework', 'CoreFoundation',
-    '-framework', 'Foundation',
-    '-framework', 'Carbon',
-    '-fvisibility=protected',
-    '-g', '-O3',
+    "-framework",
+    "CoreFoundation",
+    "-framework",
+    "Foundation",
+    # "-fvisibility=protected",
+    "-g",
+    "-lffi",
+    # "-fsanitize=address", "-fsanitize=undefined", "-fno-sanitize=vptr",
+    "-fvisibility=hidden",
+    # "-O0",
+    "-g",
+    "-O3",
+    "-flto=thin",
 ]
 
 
@@ -150,22 +172,25 @@ for k in cfg_vars:
 #
 # Support for an embedded copy of libffi
 #
-EMBEDDED_FFI_CFLAGS=['-Ilibffi-src/include', '-Ilibffi-src/powerpc']
+EMBEDDED_FFI_CFLAGS=[]
+#EMBEDDED_FFI_CFLAGS=[
+#    "-Ilibffi-src/include",
+#    "-Ilibffi-src/aarch64",
+#    ]
 
 # The list below includes the source files for all CPU types that we run on
 # this makes it easier to build fat binaries on macOS
-EMBEDDED_FFI_SOURCE=[
-    "libffi-src/ffi.c",
-    "libffi-src/types.c",
-    "libffi-src/powerpc/ppc-darwin.S",
-    "libffi-src/powerpc/ppc-darwin_closure.S",
-    "libffi-src/powerpc/ppc-ffi_darwin.c",
-    "libffi-src/powerpc/ppc64-darwin_closure.S",
-    "libffi-src/x86/darwin64.S",
-    "libffi-src/x86/x86-darwin.S",
-    "libffi-src/x86/x86-ffi64.c",
-    "libffi-src/x86/x86-ffi_darwin.c",
-]
+EMBEDDED_FFI_SOURCE=[]
+#EMBEDDED_FFI_SOURCE=[
+#    "libffi-src/closures.c",
+#    "libffi-src/java_raw_api.c",
+#    "libffi-src/prep_cif.c",
+#    "libffi-src/raw_api.c",
+#    "libffi-src/tramp.c",
+#    "libffi-src/types.c",
+#    "libffi-src/aarch64/ffi.c",
+#    "libffi-src/aarch64/sysv.S",
+#]
 
 
 

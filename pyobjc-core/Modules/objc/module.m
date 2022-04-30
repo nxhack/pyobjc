@@ -156,6 +156,12 @@ PyObject *kwds)
     return PyLong_FromVoidPtr((void*)PyObjCObject_GetObject(o));
 }
 
+static PyObject*
+ivar_dict(PyObject* self __attribute__((__unused__)))
+{
+    Py_INCREF(PyObjCInstanceVariable_Type.tp_dict);
+    return PyObjCInstanceVariable_Type.tp_dict;
+}
 
 PyDoc_STRVAR(repythonify_doc,
   "repythonify(obj, type='@')\n"
@@ -330,6 +336,18 @@ classAddMethods(PyObject* self __attribute__((__unused__)),
     return Py_None;
 }
 
+PyDoc_STRVAR(have_autorelease_pool_doc,
+             "_haveAutoreleasePool()\n" CLINIC_SEP "\n"
+             "Return True iff the global release pool is present");
+static PyObject*
+have_autorelease_pool(PyObject* self __attribute__((__unused__)))
+{
+    PyObject* result = global_release_pool ? Py_True : Py_False;
+    Py_INCREF(result);
+    return result;
+}
+
+
 PyDoc_STRVAR(remove_autorelease_pool_doc,
   "removeAutoreleasePool()\n"
   CLINIC_SEP
@@ -394,47 +412,6 @@ recycle_autorelease_pool(PyObject* self __attribute__((__unused__)),
     return Py_None;
 }
 
-PyDoc_STRVAR(set_class_extender_doc,
-    "_setClassExtender(func)\n"
-    CLINIC_SEP
-    "\n"
-    "Register a function that will be called to update the class\n"
-    "dict of new Objective-C classes and class-proxies. This will\n"
-    "replace any existing callback.\n"
-    "The function will be called like this:\n"
-    "\tclass_extender(superclass, class_name, class_dict)\n"
-    "superclass:\n"
-    "  The superclass for the new class, or None if this is the top of\n"
-    "  a class hierarchy.\n"
-    "class_name:\n"
-    "  Name of the new class\n"
-    "class_dict:\n"
-    "  The proposed class dictionary. The callback is supposed to update\n"
-    "  this dictionary.\n"
-    "");
-static PyObject*
-set_class_extender(PyObject* self __attribute__((__unused__)),
-    PyObject* args, PyObject* kwds)
-{
-static char* keywords[] = { "callback", NULL };
-    PyObject* callback;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O:setClassExtender",
-            keywords, &callback)) {
-        return NULL;
-    }
-
-    if (!PyCallable_Check(callback)) {
-        PyErr_SetString(PyExc_TypeError, "Expecting callable");
-        return NULL;
-    }
-
-    SET_FIELD_INCREF(PyObjC_ClassExtender, callback);
-
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
 
 PyDoc_STRVAR(getClassList_doc,
   "getClassList()\n"
@@ -449,36 +426,6 @@ getClassList(PyObject* self __attribute__((__unused__)))
 }
 
 
-PyDoc_STRVAR(allocateBuffer_doc,
-         "allocateBuffer(size)\n"
-         CLINIC_SEP
-         "\n"
-         "Allocate a buffer of memory of size. Buffer is \n"
-         "read/write."
-         );
-static PyObject*
-allocateBuffer(PyObject* self __attribute__((__unused__)), PyObject* args, PyObject* kwds)
-{
-    static char* keywords[] = { "length", 0 };
-    Py_ssize_t length;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "n",
-                keywords, &length)) {
-        return NULL;
-    }
-
-    if (length <= 0 ) {
-        PyErr_SetString(PyExc_ValueError,
-            "Length must be greater than 0.");
-        return NULL;
-    }
-
-#if PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION < 6
-    return PyBuffer_New(length);
-#else
-    return PyByteArray_FromStringAndSize(NULL, length);
-#endif
-}
 
 PyDoc_STRVAR(currentBundle_doc,
     "currentBundle()\n"
@@ -523,7 +470,6 @@ static PyObject*
 loadBundle(PyObject* self __attribute__((__unused__)), PyObject* args, PyObject* kwds)
 {
 static char* keywords[] = { "module_name", "module_globals", "bundle_path", "bundle_identifier", "scan_classes", NULL };
-static Py_ssize_t curClassCount = -1;
     NSBundle* bundle = nil;
     id bundle_identifier = nil;
     id bundle_path = nil;
@@ -593,7 +539,7 @@ static Py_ssize_t curClassCount = -1;
         return NULL;
     }
 
-    curClassCount = len = PyTuple_GET_SIZE(class_list);
+    len = PyTuple_GET_SIZE(class_list);
     for (i = 0; i < len; i++) {
         PyObject* item;
         const char* nm;
@@ -1384,22 +1330,20 @@ static void _callback_cleanup(PyObject* closure)
 }
 #endif /* Python >= 2.7 */
 
-static PyObject*
-_makeClosure(
-    PyObject* self __attribute__((__unused__)),
-    PyObject* args,
-    PyObject* kwds)
+static PyObject* _Nullable _makeClosure(PyObject* self __attribute__((__unused__)),
+                                        PyObject* _Nullable args,
+                                        PyObject* _Nullable kwds)
 {
-static char* keywords[] = { "callable", "closureFor", "argIndex", NULL };
-    PyObject* callable;
-    PyObject* closureFor;
+    static char*           keywords[] = {"callable", "closureFor", "argIndex", NULL};
+    PyObject*              callable;
+    PyObject*              closureFor;
     PyObjCMethodSignature* methinfo;
-    Py_ssize_t argIndex = 0;
-    Py_ssize_t i;
+    Py_ssize_t             argIndex = 0;
+    Py_ssize_t             i;
 
-    argIndex=-1;
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO|n",
-        keywords, &callable, &closureFor, &argIndex)) {
+    argIndex = -1;
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO|n", keywords, &callable, &closureFor,
+                                     &argIndex)) {
         return NULL;
     }
 
@@ -1422,8 +1366,9 @@ static char* keywords[] = { "callable", "closureFor", "argIndex", NULL };
         }
 
     } else {
-        PyErr_Format(PyExc_TypeError, "Don't know how to create closure for instance of %s",
-                Py_TYPE(closureFor)->tp_name);
+        PyErr_Format(PyExc_TypeError,
+                     "Don't know how to create closure for instance of %s",
+                     Py_TYPE(closureFor)->tp_name);
         return NULL;
     }
 
@@ -1437,39 +1382,40 @@ static char* keywords[] = { "callable", "closureFor", "argIndex", NULL };
 
         if (argIndex == -1) {
             PyErr_SetString(PyExc_ValueError,
-                "No callback argument in the specified object");
+                            "No callback argument in the specified object");
             return NULL;
         }
 
     } else {
         if (argIndex < 0 || argIndex >= Py_SIZE(methinfo)) {
-            PyErr_SetString(PyExc_IndexError,
-                "No such argument");
+            PyErr_SetString(PyExc_IndexError, "No such argument");
             return NULL;
         }
 
         if (methinfo->argtype[argIndex]->callable == NULL) {
             PyErr_Format(PyExc_ValueError,
-                "Argument %" PY_FORMAT_SIZE_T "d is not callable", argIndex);
+                         "Argument %" PY_FORMAT_SIZE_T "d is not callable", argIndex);
             return NULL;
         }
     }
 
     PyObjC_callback_function result;
 
-    result = PyObjCFFI_MakeFunctionClosure(methinfo->argtype[argIndex]->callable, callable);
+    result =
+        PyObjCFFI_MakeFunctionClosure(methinfo->argtype[argIndex]->callable, callable);
     if (result == NULL) {
         return NULL;
     }
 
-    PyObject* retval = PyCapsule_New(
-        result, "objc.__imp__", _callback_cleanup);
+    PyObject* retval = PyCapsule_New(result, "objc.__imp__", _callback_cleanup);
     if (retval == NULL) {
         PyObjCFFI_FreeIMP((IMP)result);
         return NULL;
     }
 
-    return Py_BuildValue("NN", retval, PyObjCMethodSignature_AsDict(methinfo->argtype[argIndex]->callable));
+    return Py_BuildValue(
+        "NN", retval,
+        PyObjCMethodSignature_AsDict(methinfo->argtype[argIndex]->callable));
 }
 
 PyDoc_STRVAR(_closurePointer_doc,
@@ -1503,144 +1449,9 @@ static char* keywords[] = { "closure", NULL };
 }
 
 static PyObject*
-ivar_dict(PyObject* self __attribute__((__unused__)))
-{
-    Py_INCREF(PyObjCInstanceVariable_Type.tp_dict);
-    return PyObjCInstanceVariable_Type.tp_dict;
-}
-
-static PyObject*
 mod_propertiesForClass(PyObject* mod __attribute__((__unused__)), PyObject* object)
 {
     return PyObjCClass_ListProperties(object);
-}
-
-/*
- * Helper function for decoding XML metadata:
- *
- * This fixes an issue with metadata files: metadata files use
- * _C_BOOL to represent type 'BOOL', but that the string should
- * be used to represent 'bool' which has a different size on
- * PPC. Therefore swap usage of _C_BOOL and _C_NSBOOL in data
- * from metadata files.
- */
-static void
-typecode2typecode(char* buf)
-{
-    /* Skip pointer declarations and anotations */
-    for (;;) {
-        switch(*buf) {
-        case _C_PTR:
-        case _C_IN:
-        case _C_OUT:
-        case _C_INOUT:
-        case _C_ONEWAY:
-        case _C_CONST:
-            buf++;
-            break;
-        default:
-              goto exit;
-        }
-    }
-exit:
-
-    switch (*buf) {
-    case _C_BOOL:
-        *buf = _C_NSBOOL;
-        break;
-    case _C_NSBOOL:
-        *buf = _C_BOOL;
-        break;
-        case _C_STRUCT_B:
-        while (buf && *buf != _C_STRUCT_E && *buf && *buf++ != '=') {
-        }
-        while (buf && *buf && *buf != _C_STRUCT_E) {
-            if (*buf == '"') {
-                /* embedded field name */
-                buf = strchr(buf+1, '"');
-                if (buf == NULL) {
-                    return;
-                }
-                buf++;
-            }
-            typecode2typecode(buf);
-            buf = (char*)PyObjCRT_SkipTypeSpec(buf);
-        }
-        break;
-
-    case _C_UNION_B:
-        while (buf && *buf != _C_UNION_E && *buf && *buf++ != '=') {
-        }
-        while (buf && *buf && *buf != _C_UNION_E) {
-            if (*buf == '"') {
-                /* embedded field name */
-                buf = strchr(buf+1, '"');
-                if (buf == NULL) {
-                    return;
-                }
-                buf++;
-            }
-            typecode2typecode(buf);
-            buf = (char*)PyObjCRT_SkipTypeSpec(buf);
-        }
-        break;
-
-
-    case _C_ARY_B:
-        while (isdigit(*++buf));
-        typecode2typecode(buf);
-        break;
-    }
-}
-
-
-
-static PyObject*
-typestr2typestr(PyObject* args)
-{
-    char* s;
-    char* buf;
-
-    if (PyUnicode_Check(args)) {
-        PyObject* bytes = PyUnicode_AsEncodedString(args, NULL, NULL);
-        if (bytes == NULL) {
-            return NULL;
-        }
-        buf = PyObjCUtil_Strdup(PyBytes_AsString(args));
-        Py_DECREF(bytes);
-
-    } else if (PyBytes_Check(args)) {
-        buf = PyObjCUtil_Strdup(PyBytes_AsString(args));
-    } else {
-        PyErr_SetString(PyExc_TypeError, "expecing string");
-        return NULL;
-    }
-
-    if (buf == NULL) {
-        PyErr_NoMemory();
-        return NULL;
-    }
-
-    s = buf;
-    while (s && *s) {
-        typecode2typecode(s);
-        if (s && *s == '\"') {
-            PyErr_Format(PyObjCExc_InternalError,
-                "typecode2typecode: invalid typecode '%c' "
-                "at \"%s\"", *s, s);
-            *s = '\0';
-            PyMem_Free(buf);
-            return NULL;
-
-        } else {
-            s = (char*)PyObjCRT_SkipTypeSpec(s);
-        }
-    }
-
-    PyObject* result = PyBytes_FromString(buf);
-    PyMem_Free(buf);
-
-    return result;
 }
 
 #if PyObjC_BUILD_RELEASE >= 1006
@@ -1925,351 +1736,344 @@ done:
     return Py_None;
 }
 
+#if PyObjC_BUILD_RELEASE >= 1100
+static PyObject* _Nullable mod_dyld_shared_cache_contains_path(
+    PyObject* _Nullable mod __attribute__((__unused__)), PyObject* object)
+{
+    if (!PyUnicode_Check(object)) {
+        PyErr_SetString(PyExc_TypeError, "Expecting a string");
+        return NULL;
+    }
+
+    /* This uses an availability check for 10.16 just in case
+     * we're loaded in a Python that was compiled with an old SDK.
+     */
+    if (@available(macOS 10.16, *)) {
+	  //const char* path = PyUnicode_AsUTF8(object);
+	  //if (path == NULL) {
+	  //    return NULL;
+	  //}
+        PyObject* temp = PyUnicode_AsUTF8String(object);
+        if (temp == NULL) {
+            return NULL;
+        }
+        const char* path = PyString_AsString(temp);
+        Py_DECREF(temp);
+
+        int result = _dyld_shared_cache_contains_path(path);
+        return PyBool_FromLong(result);
+    } else {
+        Py_INCREF(Py_False);
+        return Py_False;
+    }
+}
+
+#else
+
+/* Variant to be used when buildin on macOS 10.15 or earlier:
+ * use dlsym(3) APIs to look for the function.
+ */
+
+static PyObject* _Nullable mod_dyld_shared_cache_contains_path(
+    PyObject* _Nullable mod __attribute__((__unused__)), PyObject* object)
+{
+    static bool (*contains_func)(const char*) = NULL;
+    static bool resolved_func                 = 0;
+
+    if (!resolved_func) {
+        contains_func = dlsym(RTLD_DEFAULT, "_dyld_shared_cache_contains_path");
+        resolved_func = 1;
+    }
+
+    if (!PyUnicode_Check(object)) { // LCOV_BR_EXCL_LINE
+        // LCOV_EXCL_START
+        PyErr_SetString(PyExc_TypeError, "Expecting a string");
+        return NULL;
+        // LCOV_EXCL_STOP
+    }
+
+    if (contains_func) {
+	  //const char* path = PyUnicode_AsUTF8(object);
+	  //if (path == NULL) {
+      //      return NULL;
+      //}
+         PyObject* temp = PyUnicode_AsUTF8String(object);
+         if (temp == NULL) {
+             return NULL;
+         }
+         const char* path = PyString_AsString(temp);
+         Py_DECREF(temp);
+
+        int result = contains_func(path);
+        return PyBool_FromLong(result);
+    } else {
+        Py_INCREF(Py_False);
+        return Py_False;
+    }
+}
+
+#endif
 
 static PyMethodDef mod_methods[] = {
     {
-        .ml_name    = "propertiesForClass",
-        .ml_meth    = (PyCFunction)mod_propertiesForClass,
-        .ml_flags   = METH_O,
-        .ml_doc     =
-            "propertiesForClass(classObject)\n"
-            CLINIC_SEP
-            "\n"
-            "Return information about properties from the runtime",
+        .ml_name  = "propertiesForClass",
+        .ml_meth  = (PyCFunction)mod_propertiesForClass,
+        .ml_flags = METH_O,
+        .ml_doc   = "propertiesForClass(classObject)\n" CLINIC_SEP "\n"
+                    "Return information about properties from the runtime",
+    },
+    {.ml_name  = "splitSignature",
+     .ml_meth  = (PyCFunction)objc_splitSignature,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = objc_splitSignature_doc},
+    {
+        .ml_name  = "splitStructSignature",
+        .ml_meth  = (PyCFunction)objc_splitStructSignature,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc   = objc_splitStructSignature_doc,
+    },
+    {.ml_name  = "macos_available",
+     .ml_meth  = (PyCFunction)macos_available,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = macos_available_doc},
+    {.ml_name  = "lookUpClass",
+     .ml_meth  = (PyCFunction)lookUpClass,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = lookUpClass_doc},
+    {.ml_name  = "classAddMethods",
+     .ml_meth  = (PyCFunction)classAddMethods,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = classAddMethods_doc},
+    {.ml_name  = "currentBundle",
+     .ml_meth  = (PyCFunction)currentBundle,
+     .ml_flags = METH_NOARGS,
+     .ml_doc   = currentBundle_doc},
+    {.ml_name  = "getClassList",
+     .ml_meth  = (PyCFunction)getClassList,
+     .ml_flags = METH_NOARGS,
+     .ml_doc   = getClassList_doc},
+    {.ml_name  = "recycleAutoreleasePool",
+     .ml_meth  = (PyCFunction)recycle_autorelease_pool,
+     .ml_flags = METH_NOARGS,
+     .ml_doc   = recycle_autorelease_pool_doc},
+    {.ml_name  = "removeAutoreleasePool",
+     .ml_meth  = (PyCFunction)remove_autorelease_pool,
+     .ml_flags = METH_NOARGS,
+     .ml_doc   = remove_autorelease_pool_doc},
+    {.ml_name  = "_haveAutoreleasePool",
+     .ml_meth  = (PyCFunction)have_autorelease_pool,
+     .ml_flags = METH_NOARGS,
+     .ml_doc   = have_autorelease_pool_doc},
+    {.ml_name  = "pyobjc_id",
+     .ml_meth  = (PyCFunction)pyobjc_id,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = pyobjc_id_doc},
+    {.ml_name  = "repythonify",
+     .ml_meth  = (PyCFunction)repythonify,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = repythonify_doc},
+    {.ml_name  = "loadBundle",
+     .ml_meth  = (PyCFunction)loadBundle,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = loadBundle_doc},
+    {.ml_name  = "protocolsForClass",
+     .ml_meth  = (PyCFunction)protocolsForClass,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = protocolsForClass_doc},
+    {.ml_name  = "protocolsForProcess",
+     .ml_meth  = (PyCFunction)protocolsForProcess,
+     .ml_flags = METH_NOARGS,
+     .ml_doc   = protocolsForProcess_doc},
+    {.ml_name  = "_protocolNamed",
+     .ml_meth  = (PyCFunction)protocolNamed,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = protocolNamed_doc},
+    {.ml_name  = "registerCFSignature",
+     .ml_meth  = (PyCFunction)registerCFSignature,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = registerCFSignature_doc},
+    {.ml_name  = "loadBundleVariables",
+     .ml_meth  = (PyCFunction)PyObjC_loadBundleVariables,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = PyObjC_loadBundleVariables_doc},
+    {.ml_name  = "loadSpecialVar",
+     .ml_meth  = (PyCFunction)PyObjC_loadSpecialVar,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = PyObjC_loadSpecialVar_doc},
+    {.ml_name  = "loadBundleFunctions",
+     .ml_meth  = (PyCFunction)PyObjC_loadBundleFunctions,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = PyObjC_loadBundleFunctions_doc},
+    {.ml_name  = "loadFunctionList",
+     .ml_meth  = (PyCFunction)PyObjC_loadFunctionList,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = PyObjC_loadFunctionList_doc},
+    {.ml_name  = "listInstanceVariables",
+     .ml_meth  = (PyCFunction)PyObjCIvar_Info,
+     .ml_flags = METH_O,
+     .ml_doc   = PyObjCIvar_Info_doc},
+    {.ml_name  = "getInstanceVariable",
+     .ml_meth  = (PyCFunction)PyObjCIvar_Get,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = PyObjCIvar_Get_doc},
+    {.ml_name  = "setInstanceVariable",
+     .ml_meth  = (PyCFunction)PyObjCIvar_Set,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = PyObjCIvar_Set_doc},
+    {.ml_name  = "createOpaquePointerType",
+     .ml_meth  = (PyCFunction)createOpaquePointerType,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = createOpaquePointerType_doc},
+    {.ml_name  = "createStructType",
+     .ml_meth  = (PyCFunction)createStructType,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = createStructType_doc},
+    {.ml_name  = "registerStructAlias",
+     .ml_meth  = (PyCFunction)registerStructAlias,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = registerStructAlias_doc},
+    {.ml_name  = "registerMetaDataForSelector",
+     .ml_meth  = (PyCFunction)registerMetaData,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = registerMetaData_doc},
+    {.ml_name  = "_copyMetadataRegistry",
+     .ml_meth  = (PyCFunction)copyMetadataRegistry,
+     .ml_flags = METH_NOARGS,
+     .ml_doc   = copyMetadataRegistry_doc},
+    {.ml_name  = "_updatingMetadata",
+     .ml_meth  = (PyCFunction)_updatingMetadata,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = _updatingMetadata_doc},
+    {.ml_name  = "_makeClosure",
+     .ml_meth  = (PyCFunction)_makeClosure,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = _makeClosure_doc},
+    {.ml_name  = "_closurePointer",
+     .ml_meth  = (PyCFunction)_closurePointer,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = _closurePointer_doc},
+    {.ml_name    = "_ivar_dict",
+     .ml_meth    = (PyCFunction)ivar_dict,
+     .ml_flags   = METH_NOARGS,
+     .ml_doc     = "_ivar_dict()\n" CLINIC_SEP "\nPRIVATE FUNCTION\n"},
+    {.ml_name  = "_objc_sync_enter",
+     .ml_meth  = (PyCFunction)PyObjC_objc_sync_enter,
+     .ml_flags = METH_VARARGS,
+     .ml_doc   = "_objc_sync_enter(object)\n" CLINIC_SEP "\nacquire mutex for an object"},
+    {.ml_name  = "_objc_sync_exit",
+     .ml_meth  = (PyCFunction)PyObjC_objc_sync_exit,
+     .ml_flags = METH_VARARGS,
+     .ml_doc   = "_objc_sync_exit(object)\n" CLINIC_SEP "\nrelease mutex for an object"},
+    {.ml_name  = "_block_call",
+     .ml_meth  = (PyCFunction)PyObjCBlock_Call,
+     .ml_flags = METH_VARARGS,
+     "_block_call(block, signature, args, kwds)\n" CLINIC_SEP
+     "\nCall an Objective-C block"},
+    {.ml_name  = "_block_signature",
+     .ml_meth  = (PyCFunction)block_signature,
+     .ml_flags = METH_O,
+     "_block_signature(block)\n" CLINIC_SEP
+     "\nreturn signature string for a block, or None"},
+    {.ml_name  = "setAssociatedObject",
+     .ml_meth  = (PyCFunction)PyObjC_setAssociatedObject,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = PyObjC_setAssociatedObject_doc},
+    {.ml_name  = "getAssociatedObject",
+     .ml_meth  = (PyCFunction)PyObjC_getAssociatedObject,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = PyObjC_getAssociatedObject_doc},
+    {.ml_name  = "removeAssociatedObjects",
+     .ml_meth  = (PyCFunction)PyObjC_removeAssociatedObjects,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = PyObjC_removeAssociatedObjects_doc},
+    {.ml_name  = "_loadConstant",
+     .ml_meth  = (PyCFunction)PyObjC_LoadConstant,
+     .ml_flags = METH_VARARGS | METH_KEYWORDS,
+     .ml_doc   = "_loadConstant(name, type, magic)\n" CLINIC_SEP
+               "\nLoad a single C constant and return its value"},
+    {.ml_name  = "_nameForSignature",
+     .ml_meth  = (PyCFunction)name_for_signature,
+     .ml_flags = METH_O,
+     .ml_doc   = "_nameForSignature(typestr)\n" CLINIC_SEP
+               "\nReturn a pretty name for a PyObjC type string"},
+    {
+        .ml_name  = "_rescanClass",
+        .ml_meth  = (PyCFunction)force_rescan,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc   = "_rescanClass(classObject)\n" CLINIC_SEP
+                  "\nForce a rescan of the method table of a class",
     },
     {
-        .ml_name    = "splitSignature",
-        .ml_meth    = (PyCFunction)objc_splitSignature,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = objc_splitSignature_doc
+        .ml_name  = "_rescanClass",
+        .ml_meth  = (PyCFunction)force_rescan,
+        .ml_flags = METH_VARARGS | METH_KEYWORDS,
+        .ml_doc   = "_rescanClass(classObject)\n" CLINIC_SEP
+                  "\nForce a rescan of the method table of a class",
     },
     {
-        .ml_name    = "splitStructSignature",
-        .ml_meth    = (PyCFunction)objc_splitStructSignature,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = objc_splitStructSignature_doc,
+        .ml_name  = "_dyld_shared_cache_contains_path",
+        .ml_meth  = (PyCFunction)mod_dyld_shared_cache_contains_path,
+        .ml_flags = METH_O,
+        .ml_doc   = "_dyld_shared_cache_contains_path(path)\n" CLINIC_SEP
+                  "\nForce a rescan of the method table of a class",
     },
     {
-        .ml_name    = "macos_available",
-        .ml_meth    = (PyCFunction)macos_available,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = macos_available_doc
-    },
-    {
-        .ml_name    = "lookUpClass",
-        .ml_meth    = (PyCFunction)lookUpClass,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = lookUpClass_doc
-    },
-    {
-        .ml_name    = "classAddMethods",
-        .ml_meth    = (PyCFunction)classAddMethods,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = classAddMethods_doc
-    },
-    {
-        .ml_name    = "currentBundle",
-        .ml_meth    = (PyCFunction)currentBundle,
-        .ml_flags   = METH_NOARGS,
-        .ml_doc     = currentBundle_doc
-    },
-    {
-        .ml_name    = "getClassList",
-        .ml_meth    = (PyCFunction)getClassList,
-        .ml_flags   = METH_NOARGS,
-        .ml_doc     = getClassList_doc
-    },
-    {
-        .ml_name    = "_setClassExtender",
-        .ml_meth    = (PyCFunction)set_class_extender,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = set_class_extender_doc
-    },
-    {
-        .ml_name    = "recycleAutoreleasePool",
-        .ml_meth    = (PyCFunction)recycle_autorelease_pool,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = recycle_autorelease_pool_doc
-    },
-    {
-        .ml_name    = "removeAutoreleasePool",
-        .ml_meth    = (PyCFunction)remove_autorelease_pool,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = remove_autorelease_pool_doc
-    },
-    {
-        .ml_name    = "pyobjc_id",
-        .ml_meth    = (PyCFunction)pyobjc_id,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = pyobjc_id_doc
-    },
-    {
-        .ml_name    = "repythonify",
-        .ml_meth    = (PyCFunction)repythonify,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = repythonify_doc
-    },
-    {
-        .ml_name    = "loadBundle",
-        .ml_meth    = (PyCFunction)loadBundle,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = loadBundle_doc
-    },
-    {
-        .ml_name    = "allocateBuffer",
-        .ml_meth    = (PyCFunction)allocateBuffer,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = allocateBuffer_doc
-    },
-    {
-        .ml_name    = "protocolsForClass",
-        .ml_meth    = (PyCFunction)protocolsForClass,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = protocolsForClass_doc
-    },
-    {
-        .ml_name    = "protocolsForProcess",
-        .ml_meth    = (PyCFunction)protocolsForProcess,
-        .ml_flags   = METH_NOARGS,
-        .ml_doc     = protocolsForProcess_doc
-    },
-    {
-        .ml_name    = "_protocolNamed",
-        .ml_meth    = (PyCFunction)protocolNamed,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = protocolNamed_doc
-    },
-    {
-        .ml_name    = "registerCFSignature",
-        .ml_meth    = (PyCFunction)registerCFSignature,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = registerCFSignature_doc
-    },
-    {
-        .ml_name    = "loadBundleVariables",
-        .ml_meth    = (PyCFunction)PyObjC_loadBundleVariables,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = PyObjC_loadBundleVariables_doc
-    },
-    {
-        .ml_name    = "loadSpecialVar",
-        .ml_meth    = (PyCFunction)PyObjC_loadSpecialVar,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = PyObjC_loadSpecialVar_doc
-    },
-    {
-        .ml_name    = "loadBundleFunctions",
-        .ml_meth    = (PyCFunction)PyObjC_loadBundleFunctions,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = PyObjC_loadBundleFunctions_doc
-    },
-    {
-        .ml_name    = "loadFunctionList",
-        .ml_meth    = (PyCFunction)PyObjC_loadFunctionList,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = PyObjC_loadFunctionList_doc
-    },
-    {
-        .ml_name    = "listInstanceVariables",
-        .ml_meth    = (PyCFunction)PyObjCIvar_Info,
-        .ml_flags   = METH_O,
-        .ml_doc     = PyObjCIvar_Info_doc
-    },
-    {
-        .ml_name    = "getInstanceVariable",
-        .ml_meth    = (PyCFunction)PyObjCIvar_Get,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = PyObjCIvar_Get_doc
-    },
-    {
-        .ml_name    = "setInstanceVariable",
-        .ml_meth    = (PyCFunction)PyObjCIvar_Set,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = PyObjCIvar_Set_doc
-    },
-    {
-        .ml_name    = "createOpaquePointerType",
-        .ml_meth    = (PyCFunction)createOpaquePointerType,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = createOpaquePointerType_doc
-    },
-    {
-        .ml_name    = "createStructType",
-        .ml_meth    = (PyCFunction)createStructType,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = createStructType_doc
-    },
-    {
-        .ml_name    = "registerStructAlias",
-        .ml_meth    = (PyCFunction)registerStructAlias,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = registerStructAlias_doc
-    },
-    {
-        .ml_name    = "registerMetaDataForSelector",
-        .ml_meth    = (PyCFunction)registerMetaData,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = registerMetaData_doc
-    },
-    {
-        .ml_name    = "_copyMetadataRegistry",
-        .ml_meth    = (PyCFunction)copyMetadataRegistry,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = copyMetadataRegistry_doc
-    },
-    {
-        .ml_name    = "_updatingMetadata",
-        .ml_meth    = (PyCFunction)_updatingMetadata,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = _updatingMetadata_doc
-    },
-    {
-        .ml_name    = "_makeClosure",
-        .ml_meth    = (PyCFunction)_makeClosure,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = _makeClosure_doc
-    },
-    {
-        .ml_name    = "_closurePointer",
-        .ml_meth    = (PyCFunction)_closurePointer,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = _closurePointer_doc
-    },
-    {
-        .ml_name    = "_ivar_dict",
-        .ml_meth    = (PyCFunction)ivar_dict,
-        .ml_flags   = METH_NOARGS,
-        .ml_doc     = "_ivar_dict()\n" CLINIC_SEP "\nPRIVATE FUNCTION\n"
-    },
-    {
-        .ml_name    = "_objc_sync_enter",
-        .ml_meth    = (PyCFunction)PyObjC_objc_sync_enter,
-        .ml_flags   = METH_VARARGS,
-        .ml_doc     = "_objc_sync_enter(object)\n" CLINIC_SEP "\nacquire mutex for an object"
-    },
-    {
-        .ml_name    = "_objc_sync_exit",
-        .ml_meth    = (PyCFunction)PyObjC_objc_sync_exit,
-        .ml_flags   = METH_VARARGS,
-        .ml_doc     = "_objc_sync_exit(object)\n" CLINIC_SEP "\nrelease mutex for an object"
-    },
-    {
-        .ml_name    = "_block_call",
-        .ml_meth    = (PyCFunction)PyObjCBlock_Call,
-        .ml_flags   = METH_VARARGS,
-        "_block_call(block, signature, args, kwds)\n" CLINIC_SEP "\nCall an Objective-C block"
-    },
-    {
-        .ml_name    = "_block_signature",
-        .ml_meth    = (PyCFunction)block_signature,
-        .ml_flags   = METH_O,
-        "_block_signature(block)\n" CLINIC_SEP "\nreturn signature string for a block, or None"
-    },
-    {
-        .ml_name    = "_typestr2typestr",
-        .ml_meth    = (PyCFunction)typestr2typestr,
-        .ml_flags   = METH_O,
-        .ml_doc     = "_typestr2typestr(value)\n" CLINIC_SEP "\nReturns the standard Objective-C version for a PyObjC typestr"
-    },
-
-#if    PyObjC_BUILD_RELEASE >= 1006
-
-    {
-        .ml_name    = "setAssociatedObject",
-        .ml_meth    = (PyCFunction)PyObjC_setAssociatedObject,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = PyObjC_setAssociatedObject_doc
-    },
-    {
-        .ml_name    = "getAssociatedObject",
-        .ml_meth    = (PyCFunction)PyObjC_getAssociatedObject,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = PyObjC_getAssociatedObject_doc
-    },
-    {
-        .ml_name    = "removeAssociatedObjects",
-        .ml_meth    = (PyCFunction)PyObjC_removeAssociatedObjects,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = PyObjC_removeAssociatedObjects_doc
-    },
-
-#endif /* PyObjC_BUILD_RELEASE >= 1006 */
-
-    {
-        .ml_name    = "_loadConstant",
-        .ml_meth    = (PyCFunction)PyObjC_LoadConstant,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = "_loadConstant(name, type, magic)\n" CLINIC_SEP "\nLoad a single C constant and return its value"
-    },
-    {
-        .ml_name    = "_nameForSignature",
-        .ml_meth    = (PyCFunction)name_for_signature,
-        .ml_flags   = METH_O,
-        .ml_doc     = "_nameForSignature(typestr)\n" CLINIC_SEP "\nReturn a pretty name for a PyObjC type string"
-    },
-    {
-        .ml_name    = "_rescanClass",
-        .ml_meth    = (PyCFunction)force_rescan,
-        .ml_flags   = METH_VARARGS|METH_KEYWORDS,
-        .ml_doc     = "_rescanClass(classObject)\n" CLINIC_SEP "\nForce a rescan of the method table of a class",
-    },
-    {
-        .ml_name    = NULL /* SENTINEL */
-    }
-};
+        .ml_name = NULL /* SENTINEL */
+    }};
 
 struct objc_typestr_values {
-    char*    name;
-    char    value;
-} objc_typestr_values [] = {
-    { "_C_ID", _C_ID },
-    { "_C_CLASS", _C_CLASS },
-    { "_C_SEL", _C_SEL },
-    { "_C_CHR", _C_CHR },
-    { "_C_UCHR", _C_UCHR },
-    { "_C_SHT", _C_SHT },
-    { "_C_USHT", _C_USHT },
+    char* name;
+    char  value;
+} objc_typestr_values[] = {{"_C_ID", _C_ID},
+                           {"_C_CLASS", _C_CLASS},
+                           {"_C_SEL", _C_SEL},
+                           {"_C_CHR", _C_CHR},
+                           {"_C_UCHR", _C_UCHR},
+                           {"_C_SHT", _C_SHT},
+                           {"_C_USHT", _C_USHT},
 #ifdef _C_BOOL
-    { "_C_BOOL", _C_BOOL },
+                           {"_C_BOOL", _C_BOOL},
 #endif
-    { "_C_INT", _C_INT },
-    { "_C_UINT", _C_UINT },
-    { "_C_LNG", _C_LNG },
-    { "_C_ULNG", _C_ULNG },
-    { "_C_LNG_LNG", _C_LNG_LNG },
-    { "_C_ULNG_LNG", _C_ULNG_LNG },
-    { "_C_FLT", _C_FLT },
-    { "_C_DBL", _C_DBL },
-    { "_C_BFLD", _C_BFLD },
-    { "_C_VOID", _C_VOID },
-    { "_C_UNDEF", _C_UNDEF },
-    { "_C_PTR", _C_PTR },
-    { "_C_CHARPTR", _C_CHARPTR },
-    { "_C_ARY_B", _C_ARY_B },
-    { "_C_ARY_E", _C_ARY_E },
-    { "_C_UNION_B", _C_UNION_B },
-    { "_C_UNION_E", _C_UNION_E },
-    { "_C_STRUCT_B", _C_STRUCT_B },
-    { "_C_STRUCT_E", _C_STRUCT_E },
-    { "_C_CONST", _C_CONST },
-    { "_C_IN", _C_IN },
-    { "_C_INOUT", _C_INOUT },
-    { "_C_OUT", _C_OUT },
-    { "_C_BYCOPY", _C_BYCOPY },
-    { "_C_ONEWAY", _C_ONEWAY },
+                           {"_C_INT", _C_INT},
+                           {"_C_UINT", _C_UINT},
+                           {"_C_LNG", _C_LNG},
+                           {"_C_ULNG", _C_ULNG},
+                           {"_C_LNG_LNG", _C_LNG_LNG},
+                           {"_C_ULNG_LNG", _C_ULNG_LNG},
+                           {"_C_FLT", _C_FLT},
+                           {"_C_DBL", _C_DBL},
+                           {"_C_BFLD", _C_BFLD},
+                           {"_C_VOID", _C_VOID},
+                           {"_C_UNDEF", _C_UNDEF},
+                           {"_C_PTR", _C_PTR},
+                           {"_C_CHARPTR", _C_CHARPTR},
+                           {"_C_ARY_B", _C_ARY_B},
+                           {"_C_ARY_E", _C_ARY_E},
+                           {"_C_UNION_B", _C_UNION_B},
+                           {"_C_UNION_E", _C_UNION_E},
+                           {"_C_STRUCT_B", _C_STRUCT_B},
+                           {"_C_STRUCT_E", _C_STRUCT_E},
+                           {"_C_CONST", _C_CONST},
+                           {"_C_COMPLEX", _C_COMPLEX},
+                           {"_C_ATOMIC", _C_ATOMIC},
+                           {"_C_IN", _C_IN},
+                           {"_C_INOUT", _C_INOUT},
+                           {"_C_OUT", _C_OUT},
+                           {"_C_BYCOPY", _C_BYCOPY},
+                           {"_C_BYREF", _C_BYREF},
+                           {"_C_ONEWAY", _C_ONEWAY},
 
-    /* Compatibility: */
-    { "_C_LNGLNG", _C_LNG_LNG },
-    { "_C_ULNGLNG", _C_ULNG_LNG },
+                           /* Compatibility: */
+                           {"_C_LNGLNG", _C_LNG_LNG},
+                           {"_C_ULNGLNG", _C_ULNG_LNG},
 
-    /* PyObjC specific */
-    { "_C_NSBOOL",    _C_NSBOOL },
-    { "_C_UNICHAR", _C_UNICHAR },
-    { "_C_CHAR_AS_TEXT", _C_CHAR_AS_TEXT },
-    { "_C_CHAR_AS_INT", _C_CHAR_AS_INT },
+                           /* PyObjC specific */
+                           {"_C_NSBOOL", _C_NSBOOL},
+                           {"_C_UNICHAR", _C_UNICHAR},
+                           {"_C_CHAR_AS_TEXT", _C_CHAR_AS_TEXT},
+                           {"_C_CHAR_AS_INT", _C_CHAR_AS_INT},
 
-    { NULL, 0 }
-};
+                           {NULL, 0}};
 
 
 
@@ -2837,6 +2641,18 @@ PyObjC_MODULE_INIT(_objc)
         PyObjC_INITERROR();
     }
 #endif /* MAC_OS_X_VERSION_10_14_4 */
+
+#ifdef MAC_OS_X_VERSION_12_2
+    if (PyModule_AddIntConstant(m, "MAC_OS_X_VERSION_12_2", MAC_OS_X_VERSION_12_2) < 0) {
+        PyObjC_INITERROR();
+    }
+#endif /* MAC_OS_X_VERSION_12_2 */
+
+#ifdef MAC_OS_X_VERSION_12_3
+    if (PyModule_AddIntConstant(m, "MAC_OS_X_VERSION_12_3", MAC_OS_X_VERSION_12_3) < 0) {
+        PyObjC_INITERROR();
+    }
+#endif /* MAC_OS_X_VERSION_12_3 */
 
     if (PyModule_AddIntConstant(m, "PyObjC_BUILD_RELEASE", PyObjC_BUILD_RELEASE) < 0) {
         PyObjC_INITERROR();

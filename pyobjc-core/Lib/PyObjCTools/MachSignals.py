@@ -11,10 +11,15 @@ code to get executed.
 
 In other words, Python's signal handling code does not wake
 reliably when not running Python code, but this does.
+
+Note that signals will only be processed while a Cocoa
+run loop is running in the default mode.
 """
 
 from objc import _machsignals
-__all__ = ['getsignal', 'signal']
+
+__all__ = ["getsignal", "signal"]
+
 
 def getsignal(signum):
     """
@@ -23,10 +28,13 @@ def getsignal(signum):
     """
     return _machsignals._signalmapping.get(signum)
 
+
 def signal(signum, handler):
     """
     Install a new signal handler for ``signum``. Returns the old signal
     handler (``None`` when there is no previous handler.
+
+    The handler should have one argument: the signal number
     """
     rval = getsignal(signum)
     _machsignals._signalmapping[signum] = handler

@@ -155,6 +155,12 @@ OBJECT_PROP(_mapping_types, PyObjC_DictLikeTypes, NULL)
 OBJECT_PROP(_sequence_types, PyObjC_ListLikeTypes, NULL)
 OBJECT_PROP(_set_types, PyObjC_SetLikeTypes, NULL)
 OBJECT_PROP(_date_types, PyObjC_DateLikeTypes, NULL)
+OBJECT_PROP(_datetime_date_type, PyObjC_DateTime_Date_Type, NULL)
+OBJECT_PROP(_datetime_datetime_type, PyObjC_DateTime_DateTime_Type, NULL)
+OBJECT_PROP(_getKey, PyObjC_getKey, NULL)
+OBJECT_PROP(_setKey, PyObjC_setKey, NULL)
+OBJECT_PROP(_getKeyPath, PyObjC_getKeyPath, NULL)
+OBJECT_PROP(_setKeyPath, PyObjC_setKeyPath, NULL)
 
 static PyGetSetDef object_getset[] = {
     /* Public properties */
@@ -182,6 +188,12 @@ static PyGetSetDef object_getset[] = {
     GETSET(_sequence_types,         "Private list of types that proxied as instances of NSMutableArray"),
     GETSET(_set_types,              "Private list of types that proxied as instances of NSMutableSet"),
     GETSET(_date_types,             "Private list of types that proxied as instances of NSDate"),
+    GETSET(_datetime_date_type,     "Prive config for datetime.date"),
+    GETSET(_datetime_datetime_type, "Prive config for datetime.datetime"),
+    GETSET(_getKey,                 "Private helper used for KeyValueCoding support"),
+    GETSET(_setKey,                 "Private helper used for KeyValueCoding support"),
+    GETSET(_getKeyPath,             "Private helper used for KeyValueCoding support"),
+    GETSET(_setKeyPath,             "Private helper used for KeyValueCoding support"),
 #if PY_VERSION_HEX >= 0x03030000
     GETSET(_callable_signature,     "Private helper function for generating __signature__ for selectors"),
 #endif /* PY_VERSION_HEX >= 0x03030000 */

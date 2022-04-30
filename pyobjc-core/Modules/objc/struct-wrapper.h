@@ -1,5 +1,8 @@
 #ifndef PyObjC_STRUCT_WRAPPER
 #define PyObjC_STRUCT_WRAPPER
+
+NS_ASSUME_NONNULL_BEGIN
+
 /*!
  * @header struct-wrapper.h
  * @abstract Creation of mutable struct-like types
@@ -40,15 +43,10 @@
  *    fields.
  *
  */
-PyObject* PyObjC_MakeStructType(
-    const char* name,
-    const char* doc,
-    initproc tpinit,
-    Py_ssize_t numFields,
-    const char** fieldnames,
-    const char* typestr,
-    Py_ssize_t pack);
-
+PyObject* _Nullable PyObjC_MakeStructType(const char* name, const char* _Nullable doc,
+                                          initproc _Nullable tpinit, Py_ssize_t numFields,
+                                          const char* _Nonnull* _Nonnull fieldnames,
+                                          const char* typestr, Py_ssize_t pack);
 
 /*!
  * @function PyObjC_RegisterStructType
@@ -68,14 +66,12 @@ PyObject* PyObjC_MakeStructType(
  *    PyObjC_CreateRegisteredStruct can then be used to create instances of
  *    the type.
  */
-PyObject* PyObjC_RegisterStructType(
-    const char* signature,
-    const char* name,
-    const char* doc,
-    initproc tpinit,
-    Py_ssize_t numFields,
-    const char** fieldnames,
-    Py_ssize_t pack);
+PyObject* _Nullable PyObjC_RegisterStructType(const char* signature, const char* name,
+                                              const char* _Nullable doc,
+                                              initproc _Nullable tpinit,
+                                              Py_ssize_t numFields,
+                                              const char* _Nonnull* _Nullable fieldnames,
+                                              Py_ssize_t pack);
 
 /*!
  * @function PyObjC_CreateRegisteredStruct
@@ -94,7 +90,9 @@ PyObject* PyObjC_RegisterStructType(
  *     The returned instance is uninitialized, all fields are NULL. The
  *     __init__ method has not been called.
  */
-PyObject* PyObjC_CreateRegisteredStruct(const char* signature, Py_ssize_t len, const char** objc_signature, Py_ssize_t* pack);
+PyObject* _Nullable PyObjC_CreateRegisteredStruct(
+    const char* signature, Py_ssize_t len, const char* _Nonnull* _Nullable objc_signature,
+    Py_ssize_t* _Nullable pack);
 
 /*!
  * @function PyObjC_RegisterStructAlias
@@ -110,7 +108,7 @@ PyObject* PyObjC_CreateRegisteredStruct(const char* signature, Py_ssize_t len, c
  *     the struct tag and that are used for the same tasks.
  *
  *     An example of this are NSRect and CGRect (in 32-bit code
- *     this are two seperate struct types, in 64-bit code NSRect
+ *     this are two separate struct types, in 64-bit code NSRect
  *     is already an alias for CGRect). By using this function PyObjC
  *     ensures that NSRect is always an alias for CGRect in Python code.
  */
@@ -120,22 +118,22 @@ int PyObjC_RegisterStructAlias(const char* signature, PyObject* type);
  * @function PyObjC_FindRegisteredStruct
  * @param signature   An Objective-C signature for a struct type
  * @param len         Length of the sigature string
- * @result A type registered with PyObjC_CreateRegisteredStruct or PyObjC_RegisterStructAlias,
- *         or NULL when such a type cannot be found.
+ * @result A type registered with PyObjC_CreateRegisteredStruct or
+ * PyObjC_RegisterStructAlias, or NULL when such a type cannot be found.
  *
  * @discussion
  *     This function will not set an error when it cannot find
  *     a wrapper for the specified Objective-C type.
  */
-extern PyObject* PyObjC_FindRegisteredStruct(const char* signature, Py_ssize_t len);
-
+extern PyObject* _Nullable PyObjC_FindRegisteredStruct(const char* signature,
+                                                       Py_ssize_t  len);
 
 extern int PyObjC_SetStructField(PyObject* strval, Py_ssize_t inde, PyObject* value);
-extern PyObject* StructAsTuple(PyObject* strval);
-
+extern PyObject* _Nullable StructAsTuple(PyObject* strval);
 
 extern PyTypeObject StructBase_Type;
 #define PyObjCStruct_Check(obj) PyObject_TypeCheck(obj, &StructBase_Type)
 
+NS_ASSUME_NONNULL_END
 
 #endif /* PyObjC_STRUCT_MEMBER */

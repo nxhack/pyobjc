@@ -19,14 +19,23 @@ as easily cause a crash when such a signal gets in.
 
           DO NOT USE THIS MODULE IN PRODUCTION CODE
 """
-from __future__ import print_function
+
+import os
 import signal
 import traceback
-import os
+import warnings
+import sys
 
 __all__ = ["dumpStackOnFatalSignal", "resetFatalSignals"]
 
+warnings.warn(
+    "PyObjCTools.Signals is deprecated and will be removed in PyObjC 9",
+    DeprecationWarning,
+)
+
+
 originalHandlers = None
+
 
 def dumpHandler(signum, frame):
     """
@@ -34,10 +43,11 @@ def dumpHandler(signum, frame):
     then re-raise the signal
     """
     resetFatalSignals()
-    print("*** Handling fatal signal '%d'." % signum)
+    print("*** Handling fatal signal '%d'." % signum, file=sys.stderr)
     traceback.print_stack(frame)
-    print("*** Restored handlers and resignaling.")
+    print("*** Restored handlers and resignaling.", file=sys.stderr)
     os.kill(os.getpid(), signum)
+
 
 def installHandler(sig):
     """
@@ -45,6 +55,7 @@ def installHandler(sig):
     is saved in 'originalHandlers'.
     """
     originalHandlers[sig] = signal.signal(sig, dumpHandler)
+
 
 def dumpStackOnFatalSignal():
     """
@@ -66,6 +77,7 @@ def dumpStackOnFatalSignal():
         installHandler(signal.SIGBUS)
         installHandler(signal.SIGSEGV)
         installHandler(signal.SIGSYS)
+
 
 def resetFatalSignals():
     """

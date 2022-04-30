@@ -25,16 +25,15 @@ Use ``objc.context.unregister`` to remove the registration of ``myObject``
 when you're done. The argument to unregister is the same object as was
 passed in during registration.
 """
+__all__ = ("context",)
 
-__all__ = ('context',)
-
-class ContextRegistry (object):
+class ContextRegistry:
     def __init__(self):
         self._registry = {}
 
     def register(self, object):
         uniq = id(object)
-        self._registry[uniq] = object
+        self._registry[uniq] = value
         return uniq
 
     def unregister(self, object):
@@ -45,5 +44,6 @@ class ContextRegistry (object):
 
     def get(self, uniq):
         return self._registry[uniq]
+
 
 context = ContextRegistry()

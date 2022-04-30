@@ -1,11 +1,28 @@
 /*
- * Closure require special memmory support on x86_64 and PPC64: executation must be
+ * Closure require special memory support on x86_64 and PPC64: execution must be
  * explicitly enabled for the memory used for closure.
  */
 #ifndef PyObjC_CLOSURE_POOL
 #define PyObjC_CLOSURE_POOL
 
-extern ffi_closure* PyObjC_malloc_closure(void);
-extern int PyObjC_free_closure(ffi_closure* cl);
+#import <Foundation/Foundation.h>
 
-#endif /* PyObjC_CLOSURE_POOL */
+#ifndef MAC_OS_X_VERSION_10_15
+#define MAC_OS_X_VERSION_10_15 101500
+#endif
+
+//#if defined(__x86_64__) && MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_X_VERSION_10_15
+
+NS_ASSUME_NONNULL_BEGIN
+
+#define HAVE_CLOSURE_POOL 1
+
+extern ffi_closure* _Nullable PyObjC_ffi_closure_alloc(
+    size_t size, void* _Nullable* _Nonnull code_loc);
+extern int PyObjC_ffi_closure_free(ffi_closure* cl);
+
+NS_ASSUME_NONNULL_END
+
+#endif
+
+// #endif /* PyObjC_CLOSURE_POOL */

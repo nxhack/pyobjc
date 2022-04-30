@@ -810,12 +810,12 @@ call_NSDecimalNumber_decimalNumberWithDecimal_(
     }
 
     PyObjC_DURING
-        objc_superSetReceiver(super, object_getClass(PyObjCClass_GetClass(self)));
-        objc_superSetClass(super, object_getClass(PyObjCSelector_GetClass(method)));
+        super.super_class = object_getClass(PyObjCSelector_GetClass(method));
+        super.receiver    = object_getClass(PyObjCClass_GetClass(self));
 
-        res = objc_msgSendSuper(&super,
-                PyObjCSelector_GetSelector(method),
-                *aDecimal);
+        res = ((id(*)(struct objc_super*, SEL, NSDecimal))objc_msgSendSuper)(
+            &super, PyObjCSelector_GetSelector(method), *aDecimal);
+
     PyObjC_HANDLER
         PyObjCErr_FromObjC(localException);
         res = nil;
@@ -841,12 +841,11 @@ call_NSDecimalNumber_initWithDecimal_(
     }
 
     PyObjC_DURING
-        objc_superSetReceiver(super, PyObjCObject_GetObject(self));
-        objc_superSetClass(super, PyObjCSelector_GetClass(method));
+        super.super_class = PyObjCSelector_GetClass(method);
+        super.receiver    = PyObjCObject_GetObject(self);
 
-        res = objc_msgSendSuper(&super,
-                PyObjCSelector_GetSelector(method),
-                *aDecimal);
+        res = ((id(*)(struct objc_super*, SEL, NSDecimal))objc_msgSendSuper)(
+            &super, PyObjCSelector_GetSelector(method), *aDecimal);
     PyObjC_HANDLER
         PyObjCErr_FromObjC(localException);
         res = nil;
@@ -923,15 +922,15 @@ call_NSDecimalNumber_decimalValue(
         objc_superSetReceiver(super, PyObjCObject_GetObject(self));
         objc_superSetClass(super, PyObjCSelector_GetClass(method));
 
-#if defined(__i386__)
+#if defined(__i386__) || defined(__arm64__)
         /* The call below doesn't work on i386, I'm not sure why.
          * Because nobody will every subclass NSDecimalNumber this is not
          * really a problem.
          */
         aDecimal = [PyObjCObject_GetObject(self) decimalValue];
 #else
-        ((void(*)(void*, struct objc_super*, SEL))objc_msgSendSuper_stret)(&aDecimal, &super,
-                PyObjCSelector_GetSelector(method));
+        ((void (*)(void*, struct objc_super*, SEL))objc_msgSendSuper)(
+            &aDecimal, &super, PyObjCSelector_GetSelector(method));
 #endif
 
     PyObjC_HANDLER
